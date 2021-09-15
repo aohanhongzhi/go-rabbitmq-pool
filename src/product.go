@@ -21,14 +21,8 @@ var instanceRPool *rabbitmq.RabbitPool
 
 func initrabbitmq() *rabbitmq.RabbitPool {
 	oncePool.Do(func() {
-<<<<<<< HEAD
-		instanceRPool = rabbitmq.NewRabbitPool()
-		err := instanceRPool.Connect("192.168.1.80", 5672, "fnadmin", "Fn123456")
-=======
 		instanceRPool = rabbitmq.NewProductPool()
-		//47.108.223.220:32002
-		err := instanceRPool.Connect("47.108.223.220", 32002, "rabbituser", "rabbitpass")
->>>>>>> 68159f7c0b8e480c6af1a1ece04cfca690bd1e75
+		err := instanceRPool.Connect("192.168.1.80", 5672, "fnadmin", "Fn123456")
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -39,7 +33,6 @@ func initrabbitmq() *rabbitmq.RabbitPool {
 func rund() {
 
 	var wg sync.WaitGroup
-<<<<<<< HEAD
 
 	//wg.Add(1)
 	//go func() {
@@ -52,9 +45,6 @@ func rund() {
 	//}()
 
 	for i:=0;i<100000; i++ {
-=======
-	for i:=0;i<500000; i++ {
->>>>>>> 68159f7c0b8e480c6af1a1ece04cfca690bd1e75
 		wg.Add(1)
 		go func(num int) {
 			defer wg.Done()
