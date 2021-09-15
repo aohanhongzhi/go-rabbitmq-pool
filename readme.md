@@ -10,17 +10,22 @@ go get -u github.com/streadway/amqp v1.0.0
 go mod tidy
 ```
 
+> 已在线上生产环镜运行， 5200W请求 qbs 3000 时， 连接池显示无压力<br>
+> rabbitmq部署为线上集群
+
 ### 功能说明
 1. 自定义连接池大小及最大处理channel数
 2. 消费者底层断线自动重连
-3. 默认值
+3. 底层使用轮循方式复用tcp
+4. 生产者每个tcp对应一个channel,防止channel写入阻塞造成内存使用过量
+5. 支持rabbitmq exchangeType
+6. 默认值
 
 | 名称 | 说明 |
 | - | - |
 | tcp最大连接数 | 5 |
-| 生产者最大channel信道数 | 5 |
 | 生产者消费发送失败最大重试次数 | 5 |
-| 消费者最大channel信道数(每个连接自动平分) | 25(每个tcp5个) |
+| 消费者最大channel信道数(每个连接自动平分) | 100(每个tcp10个) |
 
 
 
@@ -52,7 +57,7 @@ var wg sync.WaitGroup
 		wg.Add(1)
 		go func(num int) {
 			defer wg.Done()
-			data:=rabbitmq.GetRabbitMqDataFormat("testChange5", rabbitmq.EXCHANGE_TYPE_TOPIC, "textQueue5", "/*", fmt.Sprintf("这里是数据%d", num))
+			data:=rabbitmq.GetRabbitMqDataFormat("testChange5", rabbitmq.EXCHANGE_TYPE_TOPIC, "textQueue5", "/", fmt.Sprintf("这里是数据%d", num))
 			_=instanceRPool.Push(data)
 		}(i)
 	}
@@ -69,7 +74,7 @@ nomrl := &rabbitmq.ConsumeReceive{
 \# 定义消费者事件
 		ExchangeName: "testChange5",
 		ExchangeType: rabbitmq.EXCHANGE_TYPE_TOPIC,
-		Route:        "/*",
+		Route:        "/",
 		QueueName:    "textQueue5",
 		EventFail: func(e error) {
 			fmt.Printf("error:%s",e)
