@@ -69,9 +69,10 @@ var wg sync.WaitGroup
 >
 > 每个事件独立
 >
+
 ```
 nomrl := &rabbitmq.ConsumeReceive{
-\# 定义消费者事件
+#定义消费者事件
 		ExchangeName: "testChange5",
 		ExchangeType: rabbitmq.EXCHANGE_TYPE_TOPIC,
 		Route:        "/",
@@ -84,6 +85,23 @@ nomrl := &rabbitmq.ConsumeReceive{
 		},
 	}
 	instanceConsumePool.RegisterConsumeReceive(nomrl)
+
+nomrDead := &rabbitmq.ConsumeReceive{
+#定义消费者事件
+		ExchangeName: "testChange-dead",
+		ExchangeType: rabbitmq.EXCHANGE_TYPE_DIRECT,
+		Route:        "/",
+                DeadExpireTime:10000,/死信队列标签，如果此值不等于0则声明队列为死信
+		QueueName:    "textQueue5-dead",
+		EventFail: func(e error) {
+			fmt.Printf("error:%s",e)
+		},
+		EventSuccess: func(data []byte) {
+			fmt.Printf("data:%s\n", string(data))
+		},
+	}
+	instanceConsumePool.RegisterConsumeReceive(nomrDead)
+
 	err := instanceConsumePool.RunConsume()
 	if err != nil {
 		fmt.Println(err)
