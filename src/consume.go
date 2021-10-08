@@ -17,16 +17,18 @@ func main() {
 
 func Consume() {
 	nomrl := &rabbitmq.ConsumeReceive{
-
-		ExchangeName: "testChange56",
-		ExchangeType: rabbitmq.EXCHANGE_TYPE_TOPIC,
-		Route:        "/",
-		QueueName:    "testQueue56",
-		EventFail: func(code int, e error) {
-			//fmt.Printf("code:%d, error:%s",code,e)
+		ExchangeName: "testChange31",//队列名称
+		ExchangeType: rabbitmq.EXCHANGE_TYPE_DIRECT,
+		Route:        "",
+		QueueName:    "testQueue31",
+		IsTry:true,//是否重试
+		MaxReTry: 5,//最大重试次数
+		EventFail: func(code int, e error, data []byte) {
+			fmt.Printf("error:%s", e)
 		},
-		EventSuccess: func(data []byte) {
+		EventSuccess: func(data []byte)bool {//如果返回true 则无需重试
 			fmt.Printf("data:%s\n", string(data))
+			return true
 		},
 	}
 	instanceConsumePool.RegisterConsumeReceive(nomrl)

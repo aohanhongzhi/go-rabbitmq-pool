@@ -73,16 +73,19 @@ var wg sync.WaitGroup
 ```
 nomrl := &rabbitmq.ConsumeReceive{
 #定义消费者事件
-		ExchangeName: "testChange5",
-		ExchangeType: rabbitmq.EXCHANGE_TYPE_TOPIC,
-		Route:        "/",
-		QueueName:    "textQueue5",
-		EventFail: func(e error) {
-			fmt.Printf("error:%s",e)
-		},
-		EventSuccess: func(data []byte) {
-			fmt.Printf("data:%s\n", string(data))
-		},
+		ExchangeName: "testChange31",//队列名称
+        ExchangeType: rabbitmq.EXCHANGE_TYPE_DIRECT,
+        Route:        "",
+        QueueName:    "testQueue31",
+        IsTry:true,//是否重试
+        MaxReTry: 5,//最大重试次数
+        EventFail: func(code int, e error, data []byte) {
+        	fmt.Printf("error:%s", e)
+        },
+        EventSuccess: func(data []byte)bool {//如果返回true 则无需重试
+        	fmt.Printf("data:%s\n", string(data))
+        	return true
+        },
 	}
 	instanceConsumePool.RegisterConsumeReceive(nomrl)
 
@@ -121,3 +124,4 @@ nomrDead := &rabbitmq.ConsumeReceive{
 |503|交换机/队列/绑定失败|
 |504|连接失败|
 |506|信道创建失败|
+|507|超过最大重试次数|
