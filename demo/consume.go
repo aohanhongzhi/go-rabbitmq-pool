@@ -2,6 +2,7 @@ package demo
 
 import (
 	"fmt"
+	kelleyRabbimqPool "gitee.com/tym_hmm/rabbitmq-pool-go"
 	"go-rabbitmq-pool/pool/rabbitmq"
 	"sync"
 )
@@ -16,9 +17,9 @@ func main() {
 }
 
 func Consume() {
-	nomrl := &rabbitmq.ConsumeReceive{
+	nomrl := &kelleyRabbimqPool.ConsumeReceive{
 		ExchangeName: "testChange31",//队列名称
-		ExchangeType: rabbitmq.EXCHANGE_TYPE_DIRECT,
+		ExchangeType: kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT,
 		Route:        "",
 		QueueName:    "testQueue31",
 		IsTry:true,//是否重试
@@ -26,7 +27,7 @@ func Consume() {
 		EventFail: func(code int, e error, data []byte) {
 			fmt.Printf("error:%s", e)
 		},
-		EventSuccess: func(data []byte)bool {//如果返回true 则无需重试
+		EventSuccess: func(data []byte, header map[string]interface{})bool {//如果返回true 则无需重试
 			fmt.Printf("data:%s\n", string(data))
 			return true
 		},
@@ -39,11 +40,11 @@ func Consume() {
 }
 
 var onceConsumePool sync.Once
-var instanceConsumePool *rabbitmq.RabbitPool
+var instanceConsumePool *kelleyRabbimqPool.RabbitPool
 
-func initConsumerabbitmq() *rabbitmq.RabbitPool {
+func initConsumerabbitmq() *kelleyRabbimqPool.RabbitPool {
 	onceConsumePool.Do(func() {
-		instanceConsumePool = rabbitmq.NewConsumePool()
+		instanceConsumePool = kelleyRabbimqPool.NewConsumePool()
 		//instanceConsumePool.SetMaxConsumeChannel(100)
 		err := instanceConsumePool.Connect("192.168.1.80", 5672, "fnadmin", "Fn123456")
 		if err != nil {

@@ -2,8 +2,7 @@ package demo
 
 import (
 	"fmt"
-	"go-rabbitmq-pool/pool/rabbitmq"
-	_ "net/http/pprof"
+	"gitee.com/tym_hmm/rabbitmq-pool-go"
 	"sync"
 )
 func init() {
@@ -17,11 +16,11 @@ func main() {
 }
 
 var oncePool sync.Once
-var instanceRPool *rabbitmq.RabbitPool
+var instanceRPool *kelleyRabbimqPool.RabbitPool
 
-func initrabbitmq() *rabbitmq.RabbitPool {
+func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 	oncePool.Do(func() {
-		instanceRPool = rabbitmq.NewProductPool()
+		instanceRPool = kelleyRabbimqPool.NewProductPool()
 		err := instanceRPool.Connect("192.168.1.80", 5672, "fnadmin", "Fn123456")
 		if err != nil {
 			fmt.Println(err)
@@ -48,7 +47,7 @@ func rund() {
 		wg.Add(1)
 		go func(num int) {
 			defer wg.Done()
-			data:=rabbitmq.GetRabbitMqDataFormat("fn_fnout_test", rabbitmq.EXCHANGE_TYPE_FANOUT, "", "", fmt.Sprintf("这里是数据%d", num))
+			data:=kelleyRabbimqPool.GetRabbitMqDataFormat("fn_fnout_test", kelleyRabbimqPool.EXCHANGE_TYPE_FANOUT, "", "", fmt.Sprintf("这里是数据%d", num))
 			err:=instanceRPool.Push(data)
 			if err!=nil{
 				fmt.Println(err)
