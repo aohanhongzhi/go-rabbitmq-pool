@@ -31,13 +31,13 @@ go get -u gitee.com/tym_hmm/rabbitmq-pool-go
 1. 初始化
 ```
 var oncePool sync.Once
-var instanceRPool *rabbitmq.RabbitPool
-func initrabbitmq() *rabbitmq.RabbitPool {
+var instanceRPool *kelleyRabbimqPool.RabbitPool
+func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 	oncePool.Do(func() {
         //初始化生产者
-		instanceRPool = rabbitmq.NewProductPool()
+		instanceRPool = kelleyRabbimqPool.NewProductPool()
         //初始化消费者
-	    instanceConsumePool = rabbitmq.NewConsumePool()
+	    instanceConsumePool = kelleyRabbimqPool.NewConsumePool()
 		err := instanceRPool.Connect("192.168.1.202", 5672, "guest", "guest")
 		if err != nil {
 			fmt.Println(err)
@@ -55,7 +55,7 @@ var wg sync.WaitGroup
 		wg.Add(1)
 		go func(num int) {
 			defer wg.Done()
-			data:=rabbitmq.GetRabbitMqDataFormat("testChange5", rabbitmq.EXCHANGE_TYPE_TOPIC, "textQueue5", "/", fmt.Sprintf("这里是数据%d", num))
+			data:=kelleyRabbimqPool.GetRabbitMqDataFormat("testChange5", kelleyRabbimqPool.EXCHANGE_TYPE_TOPIC, "textQueue5", "/", fmt.Sprintf("这里是数据%d", num))
 			_=instanceRPool.Push(data)
 		}(i)
 	}
@@ -72,7 +72,7 @@ var wg sync.WaitGroup
 nomrl := &rabbitmq.ConsumeReceive{
 #定义消费者事件
 		ExchangeName: "testChange31",//队列名称
-        ExchangeType: rabbitmq.EXCHANGE_TYPE_DIRECT,
+        ExchangeType: kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT,
         Route:        "",
         QueueName:    "testQueue31",
         IsTry:true,//是否重试
