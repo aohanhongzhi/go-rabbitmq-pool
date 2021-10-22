@@ -3,11 +3,9 @@
 开发语言 golang
 依赖库
 
-require github.com/streadway/amqp v1.0.0
+go get -u gitee.com/tym_hmm/rabbitmq-pool-go
 ```
-go get -u github.com/streadway/amqp v1.0.0
-或
-go mod tidy
+go get -u gitee.com/tym_hmm/rabbitmq-pool-go
 ```
 
 > 已在线上生产环镜运行， 5200W请求 qbs 3000 时， 连接池显示无压力<br>
