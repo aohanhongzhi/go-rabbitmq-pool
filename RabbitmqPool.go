@@ -1,11 +1,16 @@
-package rabbitmq
+package kelleyRabbimqPool
 
 import (
+	rand2 "crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/streadway/amqp"
 	"hash/crc32"
+	"math"
+	"math/big"
+	"math/rand"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,7 +18,7 @@ import (
 
 const (
 	DEFAULT_MAX_CONNECTION      = 5  //rabbitmq tcp 最大连接数
-	DEFAULT_MAX_CONSUME_CHANNEL = 50 //最大消费channel数(一般指消费者)
+	DEFAULT_MAX_CONSUME_CHANNEL = 25 //最大消费channel数(一般指消费者)
 	DEFAULT_MAX_CONSUME_RETRY   = 5  //消费者断线重连最大次数
 	DEFAULT_PUSH_MAX_TIME       = 5  //最大重发次数
 
@@ -71,10 +76,10 @@ type ConsumeReceive struct {
 	ExchangeType string                   //交换机类型
 	Route        string                   //路由
 	QueueName    string                   //队列名称
-	EventSuccess func([]byte) bool        //成功事件回调
+	EventSuccess func(data []byte, header map[string]interface{}) bool        //成功事件回调
 	EventFail    func(int, error, []byte) //失败回调
 
-	IsTry   bool  //是否存在死信
+	IsTry    bool  //是否重试
 	MaxReTry int32 //最大重式次数
 }
 
@@ -177,6 +182,14 @@ func (r *RabbitPool) SetMaxConnection(maxConnection int32) {
 */
 func (r *RabbitPool) SetConnectionBalance(balance int) {
 	r.connectionBalance = balance
+}
+
+func (r *RabbitPool)GetHost() string {
+	return r.host
+}
+
+func  (r *RabbitPool)GetPort() int {
+	return r.port
 }
 
 /**
@@ -462,18 +475,22 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 	rChanels, err = rDeclare(conn, pool.clientType, rChanels, receive.ExchangeName, receive.ExchangeType, receive.QueueName, receive.Route, false, "", "", "")
 	//如果存在死信队列 则需要声明
 	if receive.IsTry {
-		deadChannel, deadErr := rCreateChannel(conn)
-		if deadErr != nil {
-			if receive.EventFail != nil {
-				receive.EventFail(RCODE_CHANNEL_CREATE_ERROR, NewRabbitMqError(RCODE_CHANNEL_CREATE_ERROR, "dead channel create error", err.Error()), nil)
-			}
-			return
-		}
-		defer func() {
-			_ = deadChannel.Close()
-		}()
 
-		deadRChanels, err = rDeclare(conn, pool.clientType, deadRChanels, deadExchangeName, EXCHANGE_TYPE_DIRECT, deadQueueName, deadRouteKey, true, receive.ExchangeName, receive.QueueName, receive.Route)
+		if num%2 == 0 {
+
+			deadChannel, deadErr := rCreateChannel(conn)
+			if deadErr != nil {
+				if receive.EventFail != nil {
+					receive.EventFail(RCODE_CHANNEL_CREATE_ERROR, NewRabbitMqError(RCODE_CHANNEL_CREATE_ERROR, "dead channel create error", err.Error()), nil)
+				}
+				return
+			}
+			defer func() {
+				_ = deadChannel.Close()
+			}()
+
+			deadRChanels, err = rDeclare(conn, pool.clientType, deadRChanels, deadExchangeName, EXCHANGE_TYPE_DIRECT, deadQueueName, deadRouteKey, true, receive.ExchangeName, receive.QueueName, receive.Route)
+		}
 	}
 	if err != nil {
 		if receive.EventFail != nil {
@@ -507,7 +524,7 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 		case data := <-msgs:
 			_ = data.Ack(true)
 			if receive.EventSuccess != nil {
-				isOk := receive.EventSuccess(data.Body)
+				isOk := receive.EventSuccess(data.Body, data.Headers)
 				if !isOk {
 					retryNum, ok := data.Headers["retry_nums"]
 					var retryNums int32
@@ -523,13 +540,18 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 						}
 					} else {
 						go func(tryNum int32) {
-							time.Sleep(time.Millisecond*200)
+							time.Sleep(time.Millisecond * 200)
 							header := make(map[string]interface{}, 1)
 							header["retry_nums"] = tryNum
+
+							expirationTime, errs := RandomAround(5000, 7000)
+							if errs != nil {
+								expirationTime = 5000
+							}
 							err = channel.Publish(deadExchangeName, deadRouteKey, false, false, amqp.Publishing{
 								ContentType: "text/plain",
 								Body:        data.Body,
-								Expiration:  strconv.Itoa(5000),
+								Expiration:  strconv.FormatInt(expirationTime, 10),
 								Headers:     header,
 							})
 						}(retryNums)
@@ -601,4 +623,38 @@ func hashCode(s string) int64 {
 		return -v
 	}
 	return -1
+}
+/**
+随机数
+@param int length 生成长度
+*/
+func RandomNum(length int) string {
+	numberAttr := [10]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+	numberLen := len(numberAttr)
+	rand.Seed(time.Now().UnixNano())
+	var sb strings.Builder
+	for i := 0; i < length; i++ {
+		itemInt := numberAttr[ rand.Intn(numberLen) ]
+		sb.WriteString(strconv.Itoa(itemInt))
+	}
+	randStr := sb.String()
+	sb.Reset()
+	return randStr
+}
+
+func RandomAround(min, max int64) (int64, error) {
+	if min > max {
+		return 0, errors.New("the min is greater than max!")
+	}
+	//rand.Seed(time.Now().UnixNano())
+	if min < 0 {
+		f64Min := math.Abs(float64(min))
+		i64Min := int64(f64Min)
+		result, _ := rand2.Int(rand2.Reader, big.NewInt(max + 1 + i64Min))
+
+		return result.Int64() - i64Min,  nil
+	} else {
+		result, _ := rand2.Int(rand2.Reader, big.NewInt(max-min+1))
+		return min + result.Int64(), nil
+	}
 }

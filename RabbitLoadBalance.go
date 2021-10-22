@@ -1,4 +1,4 @@
-package rabbitmq
+package kelleyRabbimqPool
 
 /**
 连接负载处理
