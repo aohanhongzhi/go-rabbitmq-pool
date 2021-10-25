@@ -525,7 +525,7 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 			_ = data.Ack(true)
 			if receive.EventSuccess != nil {
 				isOk := receive.EventSuccess(data.Body, data.Headers)
-				if !isOk {
+				if !isOk && receive.IsTry{
 					retryNum, ok := data.Headers["retry_nums"]
 					var retryNums int32
 					if !ok {
