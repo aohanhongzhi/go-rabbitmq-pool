@@ -29,6 +29,11 @@ const (
 const (
 	RABBITMQ_TYPE_PUBLISH = 1 //生产者
 	RABBITMQ_TYPE_CONSUME = 2 //消费者
+
+
+	DEFAULT_RETRY_MIN_RANDOM_TIME = 5000//最小重试时间机数
+
+	DEFAULT_RETRY_MAX_RADNOM_TIME = 15000//最大重试时间机数
 )
 
 const (
@@ -97,6 +102,10 @@ type rConn struct {
 }
 
 type RabbitPool struct {
+
+	minRandomRetryTime int64
+	maxRandomRetryTime int64
+
 	maxConnection int32 // 最大连接数量
 	pushMaxTime   int   //最大重发次数
 
@@ -145,6 +154,8 @@ func NewConsumePool() *RabbitPool {
 
 func newRabbitPool(clientType int) *RabbitPool {
 	return &RabbitPool{
+		minRandomRetryTime: DEFAULT_RETRY_MIN_RANDOM_TIME,
+		maxRandomRetryTime: DEFAULT_RETRY_MAX_RADNOM_TIME,
 		clientType:          clientType,
 		consumeMaxChannel:   DEFAULT_MAX_CONSUME_CHANNEL,
 		maxConnection:       DEFAULT_MAX_CONNECTION,
@@ -175,6 +186,16 @@ func (r *RabbitPool) SetMaxConsumeChannel(maxConsume int32) {
 func (r *RabbitPool) SetMaxConnection(maxConnection int32) {
 	r.maxConnection = maxConnection
 }
+
+/**
+设置随时重试时间
+避免同一时刻一次重试过多
+ */
+func (r *RabbitPool)SetRandomRetryTime(min, max int64)  {
+	r.minRandomRetryTime = min
+	r.maxRandomRetryTime = max
+}
+
 
 /**
 设置连接池负载算法
@@ -540,11 +561,11 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 						}
 					} else {
 						go func(tryNum int32) {
-							time.Sleep(time.Millisecond * 200)
+							time.Sleep(time.Millisecond * 500)
 							header := make(map[string]interface{}, 1)
 							header["retry_nums"] = tryNum
 
-							expirationTime, errs := RandomAround(5000, 7000)
+							expirationTime, errs := RandomAround(pool.minRandomRetryTime, pool.maxRandomRetryTime)
 							if errs != nil {
 								expirationTime = 5000
 							}

@@ -2,8 +2,7 @@ package demo
 
 import (
 	"fmt"
-	kelleyRabbimqPool "gitee.com/tym_hmm/rabbitmq-pool-go"
-	"go-rabbitmq-pool/pool/rabbitmq"
+	"gitee.com/tym_hmm/rabbitmq-pool-go"
 	"sync"
 )
 
