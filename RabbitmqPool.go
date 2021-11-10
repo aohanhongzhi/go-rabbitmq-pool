@@ -30,10 +30,10 @@ const (
 	RABBITMQ_TYPE_PUBLISH = 1 //生产者
 	RABBITMQ_TYPE_CONSUME = 2 //消费者
 
+	DEFAULT_RETRY_MIN_RANDOM_TIME = 5000 //最小重试时间机数
 
-	DEFAULT_RETRY_MIN_RANDOM_TIME = 5000//最小重试时间机数
+	DEFAULT_RETRY_MAX_RADNOM_TIME = 15000 //最大重试时间机数
 
-	DEFAULT_RETRY_MAX_RADNOM_TIME = 15000//最大重试时间机数
 )
 
 const (
@@ -56,6 +56,74 @@ const (
 
 )
 
+type RetryClientInterface interface {
+	Push(pushData []byte) *RabbitMqError
+}
+
+/**
+重试工具
+*/
+type retryClient struct {
+	channel          *amqp.Channel
+	header           map[string]interface{}
+	deadExchangeName string
+	deadQueueName    string
+	deadRouteKey     string
+	pool             *RabbitPool
+	receive          *ConsumeReceive
+}
+
+func newRetryClient(channel *amqp.Channel, header map[string]interface{}, deadExchangeName string, deadQueueName string, deadRouteKey string, pool *RabbitPool, receive *ConsumeReceive) *retryClient {
+	return &retryClient{channel: channel, header: header, deadExchangeName: deadExchangeName, deadQueueName: deadQueueName, deadRouteKey: deadRouteKey, pool: pool, receive: receive}
+}
+
+func (r *retryClient) Push(pushData []byte) *RabbitMqError {
+	if r.channel != nil {
+		var retryNums int32
+		retryNum, ok := r.header["retry_nums"]
+		if !ok {
+			retryNums = 0
+		} else {
+			retryNums = retryNum.(int32)
+		}
+
+		retryNums += 1
+
+		if retryNums >= r.receive.MaxReTry {
+			if r.receive.EventFail != nil {
+				r.receive.EventFail(RCODE_RETRY_MAX_ERROR, NewRabbitMqError(RCODE_RETRY_MAX_ERROR, "The maximum number of retries exceeded. Procedure", ""), pushData)
+			}
+		} else {
+			go func(tryNum int32, pushD []byte) {
+				time.Sleep(time.Millisecond * 200)
+				header := make(map[string]interface{}, 1)
+				header["retry_nums"] = tryNum
+				expirationTime, errs := RandomAround(r.pool.minRandomRetryTime, r.pool.maxRandomRetryTime)
+				if errs != nil {
+					expirationTime = 5000
+				}
+
+				err := r.channel.Publish(r.deadExchangeName, r.deadRouteKey, false, false, amqp.Publishing{
+					ContentType: "text/plain",
+					Body:        pushD,
+					Expiration:  strconv.FormatInt(expirationTime, 10),
+					Headers:     r.header,
+				})
+				if err != nil {
+					if r.receive.EventFail != nil {
+						r.receive.EventFail(RCODE_RETRY_MAX_ERROR, NewRabbitMqError(RCODE_RETRY_MAX_ERROR, "The maximum number of retries exceeded. Procedure", ""), pushD)
+					}
+				}
+
+			}(retryNums, pushData)
+
+		}
+		return nil
+	} else {
+		return NewRabbitMqError(RCODE_GET_CHANNEL_ERROR, fmt.Sprintf("获取队列 %s 的消费通道失败", r.deadQueueName), fmt.Sprintf("获取队列 %s 的消费通道失败", r.deadQueueName))
+	}
+}
+
 /**
 错误返回
 */
@@ -77,15 +145,27 @@ func NewRabbitMqError(code int, message string, detail string) *RabbitMqError {
 消费者注册接收数据
 */
 type ConsumeReceive struct {
-	ExchangeName string                   //交换机
-	ExchangeType string                   //交换机类型
-	Route        string                   //路由
-	QueueName    string                   //队列名称
-	EventSuccess func(data []byte, header map[string]interface{}) bool        //成功事件回调
-	EventFail    func(int, error, []byte) //失败回调
+	ExchangeName string                                                                                  //交换机
+	ExchangeType string                                                                                  //交换机类型
+	Route        string                                                                                  //路由
+	QueueName    string                                                                                  //队列名称
+	EventSuccess func(data []byte, header map[string]interface{}, retryClient RetryClientInterface) bool //成功事件回调
+	EventFail    func(int, error, []byte)                                                                //失败回调
 
 	IsTry    bool  //是否重试
 	MaxReTry int32 //最大重式次数
+}
+
+type RetryToolInterface interface {
+	push()
+}
+
+type RetryTool struct {
+	channel *amqp.Channel
+}
+
+func (r *RetryTool) push() {
+
 }
 
 /**
@@ -102,7 +182,6 @@ type rConn struct {
 }
 
 type RabbitPool struct {
-
 	minRandomRetryTime int64
 	maxRandomRetryTime int64
 
@@ -156,6 +235,7 @@ func newRabbitPool(clientType int) *RabbitPool {
 	return &RabbitPool{
 		minRandomRetryTime: DEFAULT_RETRY_MIN_RANDOM_TIME,
 		maxRandomRetryTime: DEFAULT_RETRY_MAX_RADNOM_TIME,
+
 		clientType:          clientType,
 		consumeMaxChannel:   DEFAULT_MAX_CONSUME_CHANNEL,
 		maxConnection:       DEFAULT_MAX_CONNECTION,
@@ -190,12 +270,11 @@ func (r *RabbitPool) SetMaxConnection(maxConnection int32) {
 /**
 设置随时重试时间
 避免同一时刻一次重试过多
- */
-func (r *RabbitPool)SetRandomRetryTime(min, max int64)  {
+*/
+func (r *RabbitPool) SetRandomRetryTime(min, max int64) {
 	r.minRandomRetryTime = min
 	r.maxRandomRetryTime = max
 }
-
 
 /**
 设置连接池负载算法
@@ -205,11 +284,11 @@ func (r *RabbitPool) SetConnectionBalance(balance int) {
 	r.connectionBalance = balance
 }
 
-func (r *RabbitPool)GetHost() string {
+func (r *RabbitPool) GetHost() string {
 	return r.host
 }
 
-func  (r *RabbitPool)GetPort() int {
+func (r *RabbitPool) GetPort() int {
 	return r.port
 }
 
@@ -545,8 +624,9 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 		case data := <-msgs:
 			_ = data.Ack(true)
 			if receive.EventSuccess != nil {
-				isOk := receive.EventSuccess(data.Body, data.Headers)
-				if !isOk && receive.IsTry{
+				retryClient := newRetryClient(channel, data.Headers, deadExchangeName, deadQueueName, deadRouteKey, pool, receive)
+				isOk := receive.EventSuccess(data.Body, data.Headers, retryClient)
+				if !isOk && receive.IsTry {
 					retryNum, ok := data.Headers["retry_nums"]
 					var retryNums int32
 					if !ok {
@@ -561,7 +641,7 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 						}
 					} else {
 						go func(tryNum int32) {
-							time.Sleep(time.Millisecond * 500)
+							time.Sleep(time.Millisecond * 200)
 							header := make(map[string]interface{}, 1)
 							header["retry_nums"] = tryNum
 
@@ -569,6 +649,14 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 							if errs != nil {
 								expirationTime = 5000
 							}
+
+							//var reTryBody []byte
+							//if len(reTryByte) == 0 {
+							//	reTryBody = data.Body
+							//} else {
+							//	reTryBody = reTryByte
+							//}
+
 							err = channel.Publish(deadExchangeName, deadRouteKey, false, false, amqp.Publishing{
 								ContentType: "text/plain",
 								Body:        data.Body,
@@ -645,6 +733,7 @@ func hashCode(s string) int64 {
 	}
 	return -1
 }
+
 /**
 随机数
 @param int length 生成长度
@@ -671,9 +760,9 @@ func RandomAround(min, max int64) (int64, error) {
 	if min < 0 {
 		f64Min := math.Abs(float64(min))
 		i64Min := int64(f64Min)
-		result, _ := rand2.Int(rand2.Reader, big.NewInt(max + 1 + i64Min))
+		result, _ := rand2.Int(rand2.Reader, big.NewInt(max+1+i64Min))
 
-		return result.Int64() - i64Min,  nil
+		return result.Int64() - i64Min, nil
 	} else {
 		result, _ := rand2.Int(rand2.Reader, big.NewInt(max-min+1))
 		return min + result.Int64(), nil

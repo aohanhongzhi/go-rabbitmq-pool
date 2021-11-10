@@ -80,7 +80,13 @@ nomrl := &rabbitmq.ConsumeReceive{
         EventFail: func(code int, e error, data []byte) {
         	fmt.Printf("error:%s", e)
         },
-        EventSuccess: func(data []byte, header map[string]interface{})bool {//如果返回true 则无需重试
+        /***
+         * 参数说明
+         * @param data []byte 接收的rabbitmq数据
+         * @param header map[string]interface{} 原rabbitmq header
+         * @param retryClient RabbitmqPool.RetryClientInterface 自定义重试数据接口，重试需return true 防止数据重复提交
+         ***/
+        EventSuccess: func(data []byte, header map[string]interface{},retryClient kelleyRabbimqPool.RetryClientInterface)bool {//如果返回true 则无需重试
         	fmt.Printf("data:%s\n", string(data))
         	return true
         },

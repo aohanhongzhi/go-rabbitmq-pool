@@ -26,7 +26,7 @@ func Consume() {
 		EventFail: func(code int, e error, data []byte) {
 			fmt.Printf("error:%s", e)
 		},
-		EventSuccess: func(data []byte, header map[string]interface{})bool {//如果返回true 则无需重试
+		EventSuccess: func(data []byte, header map[string]interface{}, retryClient kelleyRabbimqPool.RetryClientInterface)bool {//如果返回true 则无需重试
 			fmt.Printf("data:%s\n", string(data))
 			return true
 		},
