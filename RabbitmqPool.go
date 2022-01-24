@@ -16,6 +16,10 @@ import (
 	"time"
 )
 
+var (
+	ACK_DATA_NIL = errors.New("ack data nil")
+)
+
 const (
 	DEFAULT_MAX_CONNECTION      = 5  //rabbitmq tcp 最大连接数
 	DEFAULT_MAX_CONSUME_CHANNEL = 25 //最大消费channel数(一般指消费者)
@@ -58,6 +62,7 @@ const (
 
 type RetryClientInterface interface {
 	Push(pushData []byte) *RabbitMqError
+	Ack() error
 }
 
 /**
@@ -65,6 +70,7 @@ type RetryClientInterface interface {
 */
 type retryClient struct {
 	channel          *amqp.Channel
+	data             *amqp.Delivery
 	header           map[string]interface{}
 	deadExchangeName string
 	deadQueueName    string
@@ -73,8 +79,20 @@ type retryClient struct {
 	receive          *ConsumeReceive
 }
 
-func newRetryClient(channel *amqp.Channel, header map[string]interface{}, deadExchangeName string, deadQueueName string, deadRouteKey string, pool *RabbitPool, receive *ConsumeReceive) *retryClient {
-	return &retryClient{channel: channel, header: header, deadExchangeName: deadExchangeName, deadQueueName: deadQueueName, deadRouteKey: deadRouteKey, pool: pool, receive: receive}
+func newRetryClient(channel *amqp.Channel, data *amqp.Delivery, header map[string]interface{}, deadExchangeName string, deadQueueName string, deadRouteKey string, pool *RabbitPool, receive *ConsumeReceive) *retryClient {
+	return &retryClient{channel: channel, data: data, header: header, deadExchangeName: deadExchangeName, deadQueueName: deadQueueName, deadRouteKey: deadRouteKey, pool: pool, receive: receive}
+}
+
+func (r *retryClient) Ack() error {
+	//如果是非自动确认消息 手动进行确认
+	if ! r.receive.IsAutoAck {
+
+		if r.data != nil {
+			return r.data.Ack(true)
+		}
+		return ACK_DATA_NIL
+	}
+	return nil
 }
 
 func (r *retryClient) Push(pushData []byte) *RabbitMqError {
@@ -152,8 +170,9 @@ type ConsumeReceive struct {
 	EventSuccess func(data []byte, header map[string]interface{}, retryClient RetryClientInterface) bool //成功事件回调
 	EventFail    func(int, error, []byte)                                                                //失败回调
 
-	IsTry    bool  //是否重试
-	MaxReTry int32 //最大重式次数
+	IsTry     bool  //是否重试
+	MaxReTry  int32 //最大重式次数
+	IsAutoAck bool  //是否自动确认
 }
 
 type RetryToolInterface interface {
@@ -622,9 +641,12 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 	for {
 		select {
 		case data := <-msgs:
-			_ = data.Ack(true)
+			fmt.Println("receive.isAutoAc", receive.IsAutoAck)
+			if receive.IsAutoAck { //如果是自动确认,否则需使用回调用 newRetryClient Ack
+				_ = data.Ack(true)
+			}
 			if receive.EventSuccess != nil {
-				retryClient := newRetryClient(channel, data.Headers, deadExchangeName, deadQueueName, deadRouteKey, pool, receive)
+				retryClient := newRetryClient(channel, &data, data.Headers, deadExchangeName, deadQueueName, deadRouteKey, pool, receive)
 				isOk := receive.EventSuccess(data.Body, data.Headers, retryClient)
 				if !isOk && receive.IsTry {
 					retryNum, ok := data.Headers["retry_nums"]

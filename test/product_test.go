@@ -1,19 +1,19 @@
-package demo
+package test
 
 import (
 	"fmt"
-	"gitee.com/tym_hmm/rabbitmq-pool-go"
+	kelleyRabbimqPool "gitee.com/tym_hmm/rabbitmq-pool-go"
 	"sync"
+	"testing"
 )
-func init() {
-	// 初始化
-	initrabbitmq()
-}
 
-func main() {
-	fmt.Println("开始")
+func TestProduct(t *testing.T)  {
+	initrabbitmq()
 	rund()
 }
+
+
+
 
 var oncePool sync.Once
 var instanceRPool *kelleyRabbimqPool.RabbitPool
@@ -21,7 +21,7 @@ var instanceRPool *kelleyRabbimqPool.RabbitPool
 func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 	oncePool.Do(func() {
 		instanceRPool = kelleyRabbimqPool.NewProductPool()
-		err := instanceRPool.Connect("192.168.1.80", 5672, "fnadmin", "Fn123456")
+		err := instanceRPool.Connect("192.168.1.169", 5672, "admin", "admin")
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -47,7 +47,7 @@ func rund() {
 		wg.Add(1)
 		go func(num int) {
 			defer wg.Done()
-			data:=kelleyRabbimqPool.GetRabbitMqDataFormat("fn_fnout_test", kelleyRabbimqPool.EXCHANGE_TYPE_FANOUT, "", "", fmt.Sprintf("这里是数据%d", num))
+			data:=kelleyRabbimqPool.GetRabbitMqDataFormat("testChange31", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "testQueue31", "", fmt.Sprintf("这里是数据%d", num))
 			err:=instanceRPool.Push(data)
 			if err!=nil{
 				fmt.Println(err)
