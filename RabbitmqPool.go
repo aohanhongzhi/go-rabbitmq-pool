@@ -641,7 +641,6 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 	for {
 		select {
 		case data := <-msgs:
-			fmt.Println("receive.isAutoAc", receive.IsAutoAck)
 			if receive.IsAutoAck { //如果是自动确认,否则需使用回调用 newRetryClient Ack
 				_ = data.Ack(true)
 			}
