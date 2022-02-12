@@ -126,6 +126,7 @@ func (r *retryClient) Push(pushData []byte) *RabbitMqError {
 					Body:        pushD,
 					Expiration:  strconv.FormatInt(expirationTime, 10),
 					Headers:     r.header,
+					DeliveryMode: amqp.Persistent,
 				})
 				if err != nil {
 					if r.receive.EventFail != nil {
