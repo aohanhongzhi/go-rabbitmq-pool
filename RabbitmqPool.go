@@ -679,10 +679,11 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 							//}
 
 							err = channel.Publish(deadExchangeName, deadRouteKey, false, false, amqp.Publishing{
-								ContentType: "text/plain",
-								Body:        data.Body,
-								Expiration:  strconv.FormatInt(expirationTime, 10),
-								Headers:     header,
+								ContentType:  "text/plain",
+								Body:         data.Body,
+								Expiration:   strconv.FormatInt(expirationTime, 10),
+								Headers:      header,
+								DeliveryMode: amqp.Persistent,
 							})
 						}(retryNums)
 					}
@@ -718,8 +719,9 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 		return NewRabbitMqError(RCODE_GET_CHANNEL_ERROR, "获取信道失败", err.Error())
 	} else {
 		err = rChannel.ch.Publish(data.ExchangeName, data.Route, false, false, amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(data.Data),
+			ContentType:  "text/plain",
+			Body:         []byte(data.Data),
+			DeliveryMode: amqp.Persistent, //持久化到磁盘
 		})
 		if err != nil { //如果消息发送失败, 重试发送
 			//pool.channelLock.Unlock()

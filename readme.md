@@ -17,7 +17,8 @@ go get -u gitee.com/tym_hmm/rabbitmq-pool-go
 3. 底层使用轮循方式复用tcp
 4. 生产者每个tcp对应一个channel,防止channel写入阻塞造成内存使用过量
 5. 支持rabbitmq exchangeType
-6. 默认值
+6. 默认交换机、队列、消息都会持久化磁盘
+7. 默认值
 
 | 名称 | 说明 |
 | --- | --- |
