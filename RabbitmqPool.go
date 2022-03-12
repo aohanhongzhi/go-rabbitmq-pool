@@ -235,6 +235,7 @@ type RabbitPool struct {
 	port     int    //服务端口
 	user     string //用户名
 	password string //密码
+	virtualHost string // 默认为/
 }
 
 /**
@@ -324,8 +325,27 @@ func (r *RabbitPool) Connect(host string, port int, user string, password string
 	r.port = port
 	r.user = user
 	r.password = password
+	r.virtualHost = "/"
 	return r.initConnections(false)
 }
+
+/**
+自定义虚拟机连接
+@param host string 服务器地址
+@param port int 服务端口
+@param user string 用户名
+@param password 密码
+@param virtualHost虚拟机路径
+ */
+func (r *RabbitPool)ConnectVirtualHost(host string, port int, user string, password string, virtualHost string) error {
+	r.host = host
+	r.port = port
+	r.user = user
+	r.password = password
+	r.virtualHost = virtualHost
+	return r.initConnections(false)
+}
+
 
 /**
 注册消费接收
@@ -427,7 +447,11 @@ func (r *RabbitPool) initChannels(conn *rConn, exChangeName string, exChangeType
 原rabbitmq连接
 */
 func rConnect(r *RabbitPool, islock bool) (*amqp.Connection, error) {
-	connectionUrl := fmt.Sprintf("amqp://%s:%s@%s:%d/", r.user, r.password, r.host, r.port)
+	virtualHost := "/"
+	if len(strings.TrimSpace(r.virtualHost))>0{
+		virtualHost = r.virtualHost
+	}
+	connectionUrl := fmt.Sprintf("amqp://%s:%s@%s:%d%s", r.user, r.password, r.host, r.port, virtualHost)
 	client, err := amqp.Dial(connectionUrl)
 	if err != nil {
 		return nil, err
