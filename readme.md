@@ -39,7 +39,10 @@ func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 		instanceRPool = kelleyRabbimqPool.NewProductPool()
         //初始化消费者
 	    instanceConsumePool = kelleyRabbimqPool.NewConsumePool()
+        //使用默认虚拟host "/"
 		err := instanceRPool.Connect("192.168.1.202", 5672, "guest", "guest")
+        //使用自定义虚
+        //err:=instanceConsumePool.ConnectVirtualHost("192.168.1.202", 5672, "guest", "guest", "/testHost")
 		if err != nil {
 			fmt.Println(err)
 		}

@@ -44,7 +44,8 @@ func initConsumerabbitmq() *kelleyRabbimqPool.RabbitPool {
 	onceConsumePool.Do(func() {
 		instanceConsumePool = kelleyRabbimqPool.NewConsumePool()
 		//instanceConsumePool.SetMaxConsumeChannel(100)
-		err := instanceConsumePool.Connect("192.168.1.169", 5672, "admin", "admin")
+		//err := instanceConsumePool.Connect("192.168.1.169", 5672, "admin", "admin")
+		err:=instanceConsumePool.ConnectVirtualHost("192.168.1.169", 5672, "temptest", "test123456", "/temptest1")
 		if err != nil {
 			fmt.Println(err)
 		}

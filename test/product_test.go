@@ -21,7 +21,8 @@ var instanceRPool *kelleyRabbimqPool.RabbitPool
 func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 	oncePool.Do(func() {
 		instanceRPool = kelleyRabbimqPool.NewProductPool()
-		err := instanceRPool.Connect("192.168.1.169", 5672, "admin", "admin")
+		//err := instanceRPool.Connect("192.168.1.169", 5672, "admin", "admin")
+		err:=instanceRPool.ConnectVirtualHost("192.168.1.169", 5672, "temptest", "test123456", "/temptest1")
 		if err != nil {
 			fmt.Println(err)
 		}

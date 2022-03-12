@@ -452,6 +452,7 @@ func rConnect(r *RabbitPool, islock bool) (*amqp.Connection, error) {
 		virtualHost = r.virtualHost
 	}
 	connectionUrl := fmt.Sprintf("amqp://%s:%s@%s:%d%s", r.user, r.password, r.host, r.port, virtualHost)
+	fmt.Println(connectionUrl)
 	client, err := amqp.Dial(connectionUrl)
 	if err != nil {
 		return nil, err
