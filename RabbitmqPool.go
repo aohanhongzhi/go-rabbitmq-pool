@@ -85,7 +85,7 @@ func newRetryClient(channel *amqp.Channel, data *amqp.Delivery, header map[strin
 
 func (r *retryClient) Ack() error {
 	//如果是非自动确认消息 手动进行确认
-	if ! r.receive.IsAutoAck {
+	if !r.receive.IsAutoAck {
 
 		if r.data != nil {
 			return r.data.Ack(true)
@@ -122,10 +122,10 @@ func (r *retryClient) Push(pushData []byte) *RabbitMqError {
 				}
 
 				err := r.channel.Publish(r.deadExchangeName, r.deadRouteKey, false, false, amqp.Publishing{
-					ContentType: "text/plain",
-					Body:        pushD,
-					Expiration:  strconv.FormatInt(expirationTime, 10),
-					Headers:     r.header,
+					ContentType:  "text/plain",
+					Body:         pushD,
+					Expiration:   strconv.FormatInt(expirationTime, 10),
+					Headers:      r.header,
 					DeliveryMode: amqp.Persistent,
 				})
 				if err != nil {
@@ -231,10 +231,10 @@ type RabbitPool struct {
 
 	connectStatus bool
 
-	host     string //服务ip
-	port     int    //服务端口
-	user     string //用户名
-	password string //密码
+	host        string //服务ip
+	port        int    //服务端口
+	user        string //用户名
+	password    string //密码
 	virtualHost string // 默认为/
 }
 
@@ -336,8 +336,8 @@ func (r *RabbitPool) Connect(host string, port int, user string, password string
 @param user string 用户名
 @param password 密码
 @param virtualHost虚拟机路径
- */
-func (r *RabbitPool)ConnectVirtualHost(host string, port int, user string, password string, virtualHost string) error {
+*/
+func (r *RabbitPool) ConnectVirtualHost(host string, port int, user string, password string, virtualHost string) error {
 	r.host = host
 	r.port = port
 	r.user = user
@@ -345,7 +345,6 @@ func (r *RabbitPool)ConnectVirtualHost(host string, port int, user string, passw
 	r.virtualHost = virtualHost
 	return r.initConnections(false)
 }
-
 
 /**
 注册消费接收
@@ -448,7 +447,7 @@ func (r *RabbitPool) initChannels(conn *rConn, exChangeName string, exChangeType
 */
 func rConnect(r *RabbitPool, islock bool) (*amqp.Connection, error) {
 	virtualHost := "/"
-	if len(strings.TrimSpace(r.virtualHost))>0{
+	if len(strings.TrimSpace(r.virtualHost)) > 0 {
 		virtualHost = r.virtualHost
 	}
 	connectionUrl := fmt.Sprintf("amqp://%s:%s@%s:%d%s", r.user, r.password, r.host, r.port, virtualHost)
@@ -562,9 +561,10 @@ func retryConsume(pool *RabbitPool) {
 func rListenerConsume(pool *RabbitPool, receive *ConsumeReceive) {
 	var i int32 = 0
 	for i = 0; i < pool.consumeMaxChannel; i++ {
+		itemI := i
 		go func(num int32, p *RabbitPool, r *ConsumeReceive) {
 			consumeTask(num, p, r)
-		}(i, pool, receive)
+		}(itemI, pool, receive)
 	}
 }
 
@@ -793,7 +793,7 @@ func RandomNum(length int) string {
 	rand.Seed(time.Now().UnixNano())
 	var sb strings.Builder
 	for i := 0; i < length; i++ {
-		itemInt := numberAttr[ rand.Intn(numberLen) ]
+		itemInt := numberAttr[rand.Intn(numberLen)]
 		sb.WriteString(strconv.Itoa(itemInt))
 	}
 	randStr := sb.String()
