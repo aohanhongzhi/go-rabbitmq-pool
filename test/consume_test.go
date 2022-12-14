@@ -16,8 +16,8 @@ func Consume() {
 	nomrl := &kelleyRabbimqPool.ConsumeReceive{
 		ExchangeName: "testChange31", //队列名称
 		ExchangeType: kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT,
-		Route:        "",
-		QueueName:    "testQueue31",
+		Route:        "route",
+		QueueName:    "",
 		IsTry:        true,  //是否重试
 		IsAutoAck:    false, //自动消息确认
 		MaxReTry:     5,     //最大重试次数

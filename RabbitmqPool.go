@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"hash/crc32"
+	"log"
 	"math"
 	"math/big"
 	"math/rand"
@@ -46,7 +47,8 @@ const (
 	EXCHANGE_TYPE_TOPIC  = "topic"  //Topic：通配符，把消息交给符合routing pattern（路由模式） 的队列
 )
 
-/**
+/*
+*
 错误码
 */
 const (
@@ -65,7 +67,8 @@ type RetryClientInterface interface {
 	Ack() error
 }
 
-/**
+/*
+*
 重试工具
 */
 type retryClient struct {
@@ -143,7 +146,8 @@ func (r *retryClient) Push(pushData []byte) *RabbitMqError {
 	}
 }
 
-/**
+/*
+*
 错误返回
 */
 type RabbitMqError struct {
@@ -160,7 +164,8 @@ func NewRabbitMqError(code int, message string, detail string) *RabbitMqError {
 	return &RabbitMqError{Code: code, Message: message, Detail: detail}
 }
 
-/**
+/*
+*
 消费者注册接收数据
 */
 type ConsumeReceive struct {
@@ -188,7 +193,8 @@ func (r *RetryTool) push() {
 
 }
 
-/**
+/*
+*
 单个rabbitmq channel
 */
 type rChannel struct {
@@ -238,14 +244,16 @@ type RabbitPool struct {
 	virtualHost string // 默认为/
 }
 
-/**
+/*
+*
 初始化生产者
 */
 func NewProductPool() *RabbitPool {
 	return newRabbitPool(RABBITMQ_TYPE_PUBLISH)
 }
 
-/**
+/*
+*
 初始化消费者
 */
 func NewConsumePool() *RabbitPool {
@@ -274,21 +282,24 @@ func newRabbitPool(clientType int) *RabbitPool {
 	}
 }
 
-/**
+/*
+*
 设置消费者最大信道数
 */
 func (r *RabbitPool) SetMaxConsumeChannel(maxConsume int32) {
 	r.consumeMaxChannel = maxConsume
 }
 
-/**
+/*
+*
 设置最大连接数
 */
 func (r *RabbitPool) SetMaxConnection(maxConnection int32) {
 	r.maxConnection = maxConnection
 }
 
-/**
+/*
+*
 设置随时重试时间
 避免同一时刻一次重试过多
 */
@@ -297,7 +308,8 @@ func (r *RabbitPool) SetRandomRetryTime(min, max int64) {
 	r.maxRandomRetryTime = max
 }
 
-/**
+/*
+*
 设置连接池负载算法
 默认轮循
 */
@@ -313,7 +325,8 @@ func (r *RabbitPool) GetPort() int {
 	return r.port
 }
 
-/**
+/*
+*
 连接rabbitmq
 @param host string 服务器地址
 @param port int 服务端口
@@ -329,7 +342,8 @@ func (r *RabbitPool) Connect(host string, port int, user string, password string
 	return r.initConnections(false)
 }
 
-/**
+/*
+*
 自定义虚拟机连接
 @param host string 服务器地址
 @param port int 服务端口
@@ -346,7 +360,8 @@ func (r *RabbitPool) ConnectVirtualHost(host string, port int, user string, pass
 	return r.initConnections(false)
 }
 
-/**
+/*
+*
 注册消费接收
 */
 func (r *RabbitPool) RegisterConsumeReceive(consumeReceive *ConsumeReceive) {
@@ -355,7 +370,8 @@ func (r *RabbitPool) RegisterConsumeReceive(consumeReceive *ConsumeReceive) {
 	}
 }
 
-/**
+/*
+*
 消费者
 */
 func (r *RabbitPool) RunConsume() error {
@@ -367,14 +383,16 @@ func (r *RabbitPool) RunConsume() error {
 	return nil
 }
 
-/**
+/*
+*
 发送消息
 */
 func (r *RabbitPool) Push(data *RabbitMqData) *RabbitMqError {
 	return rPush(r, data, 1)
 }
 
-/**
+/*
+*
 获取当前连接
 1.这里可以做负载算法, 默认使用轮循
 */
@@ -386,7 +404,8 @@ func (r *RabbitPool) getConnection() *rConn {
 	return r.connections[r.clientType][r.connectionIndex]
 }
 
-/**
+/*
+*
 获取信道
 1.如果当前信道池不存在则创建
 2.如果信息池存在则直接获取
@@ -413,7 +432,8 @@ func (r *RabbitPool) getChannelQueue(conn *rConn, exChangeName string, exChangeT
 	}
 }
 
-/**
+/*
+*
 初始化连接池
 */
 func (r *RabbitPool) initConnections(isLock bool) error {
@@ -430,7 +450,8 @@ func (r *RabbitPool) initConnections(isLock bool) error {
 	return nil
 }
 
-/**
+/*
+*
 初始化信道池
 */
 func (r *RabbitPool) initChannels(conn *rConn, exChangeName string, exChangeType string, queueName string, route string) (*rChannel, error) {
@@ -442,7 +463,8 @@ func (r *RabbitPool) initChannels(conn *rConn, exChangeName string, exChangeType
 	return rChannel, nil
 }
 
-/**
+/*
+*
 原rabbitmq连接
 */
 func rConnect(r *RabbitPool, islock bool) (*amqp.Connection, error) {
@@ -459,7 +481,8 @@ func rConnect(r *RabbitPool, islock bool) (*amqp.Connection, error) {
 	return client, nil
 }
 
-/**
+/*
+*
 创建rabbitmq信道
 */
 func rCreateChannel(conn *rConn) (*amqp.Channel, error) {
@@ -470,7 +493,8 @@ func rCreateChannel(conn *rConn) (*amqp.Channel, error) {
 	return ch, nil
 }
 
-/**
+/*
+*
 绑定并声明
 @param rconn *rConn tcp连接对象
 @param clientType int 客户端类型
@@ -512,7 +536,8 @@ func rDeclare(rconn *rConn, clientType int, channel *rChannel, exChangeName stri
 	return channel, nil
 }
 
-/**
+/*
+*
 消费者处理
 */
 func rConsume(pool *RabbitPool) {
@@ -535,7 +560,8 @@ func rConsume(pool *RabbitPool) {
 
 }
 
-/**
+/*
+*
 重连处理
 */
 func retryConsume(pool *RabbitPool) {
@@ -555,7 +581,8 @@ func retryConsume(pool *RabbitPool) {
 
 }
 
-/**
+/*
+*
 监听消费
 */
 func rListenerConsume(pool *RabbitPool, receive *ConsumeReceive) {
@@ -729,7 +756,8 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 	}
 }
 
-/**
+/*
+*
 发送消息
 */
 func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
@@ -754,6 +782,7 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 			//如果没有发送成功,休息两秒重发
 			time.Sleep(time.Second * 2)
 			sendTime++
+			log.Print("数据重发了", data)
 			return rPush(pool, data, sendTime)
 		}
 
@@ -761,7 +790,8 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 	return nil
 }
 
-/**
+/*
+*
 信道hashcode
 */
 func channelHashCode(clientType int, connIndex int32, exChangeName string, exChangeType string, queueName string, route string) int64 {
@@ -769,7 +799,8 @@ func channelHashCode(clientType int, connIndex int32, exChangeName string, exCha
 	return channelHashCode
 }
 
-/**
+/*
+*
 计算hashcode唯一值
 */
 func hashCode(s string) int64 {
@@ -783,7 +814,8 @@ func hashCode(s string) int64 {
 	return -1
 }
 
-/**
+/*
+*
 随机数
 @param int length 生成长度
 */

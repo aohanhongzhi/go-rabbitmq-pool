@@ -43,17 +43,25 @@ func rund() {
 	//	fmt.Println(err)
 	//}()
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 1; i++ {
 		wg.Add(1)
 		go func(num int) {
 			defer wg.Done()
-			data := kelleyRabbimqPool.GetRabbitMqDataFormat("testChange31", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "testQueue31", "", fmt.Sprintf("这里是数据%d", num))
-			err := instanceRPool.Push(data)
-			if err != nil {
-				fmt.Println(err)
-			}
+			Send(num)
 		}(i)
 	}
-
 	wg.Wait()
+}
+
+func Send(num int) {
+	data := kelleyRabbimqPool.GetRabbitMqDataFormat("testChange31", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "route1", fmt.Sprintf("这里是数据%d", num))
+	err := instanceRPool.Push(data)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func TestSendOne(t *testing.T) {
+	initrabbitmq()
+	Send(1)
 }
