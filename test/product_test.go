@@ -7,13 +7,10 @@ import (
 	"testing"
 )
 
-func TestProduct(t *testing.T)  {
+func TestProduct(t *testing.T) {
 	initrabbitmq()
 	rund()
 }
-
-
-
 
 var oncePool sync.Once
 var instanceRPool *kelleyRabbimqPool.RabbitPool
@@ -22,7 +19,9 @@ func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 	oncePool.Do(func() {
 		instanceRPool = kelleyRabbimqPool.NewProductPool()
 		//err := instanceRPool.Connect("192.168.1.169", 5672, "admin", "admin")
-		err:=instanceRPool.ConnectVirtualHost("192.168.1.169", 5672, "temptest", "test123456", "/temptest1")
+		err := instanceRPool.Connect("rabbitmq.cupb.top", 5672, "admin", "Jian,Yin.2019")
+
+		//err:=instanceRPool.ConnectVirtualHost("192.168.1.169", 5672, "temptest", "test123456", "/temptest1")
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -44,13 +43,13 @@ func rund() {
 	//	fmt.Println(err)
 	//}()
 
-	for i:=0;i<100000; i++ {
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(num int) {
 			defer wg.Done()
-			data:=kelleyRabbimqPool.GetRabbitMqDataFormat("testChange31", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "testQueue31", "", fmt.Sprintf("这里是数据%d", num))
-			err:=instanceRPool.Push(data)
-			if err!=nil{
+			data := kelleyRabbimqPool.GetRabbitMqDataFormat("testChange31", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "testQueue31", "", fmt.Sprintf("这里是数据%d", num))
+			err := instanceRPool.Push(data)
+			if err != nil {
 				fmt.Println(err)
 			}
 		}(i)

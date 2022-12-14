@@ -7,24 +7,24 @@ import (
 	"testing"
 )
 
-func TestConsume(t *testing.T)  {
+func TestConsume(t *testing.T) {
 	initConsumerabbitmq()
 	Consume()
 }
 
 func Consume() {
 	nomrl := &kelleyRabbimqPool.ConsumeReceive{
-		ExchangeName: "testChange31",//队列名称
+		ExchangeName: "testChange31", //队列名称
 		ExchangeType: kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT,
 		Route:        "",
 		QueueName:    "testQueue31",
-		IsTry:true,//是否重试
-		IsAutoAck:false,//自动消息确认
-		MaxReTry: 5,//最大重试次数
+		IsTry:        true,  //是否重试
+		IsAutoAck:    false, //自动消息确认
+		MaxReTry:     5,     //最大重试次数
 		EventFail: func(code int, e error, data []byte) {
 			fmt.Printf("error:%s", e)
 		},
-		EventSuccess: func(data []byte, header map[string]interface{}, retryClient kelleyRabbimqPool.RetryClientInterface)bool {//如果返回true 则无需重试
+		EventSuccess: func(data []byte, header map[string]interface{}, retryClient kelleyRabbimqPool.RetryClientInterface) bool { //如果返回true 则无需重试
 			_ = retryClient.Ack()
 			fmt.Printf("data:%s\n", string(data))
 			return true
@@ -45,7 +45,8 @@ func initConsumerabbitmq() *kelleyRabbimqPool.RabbitPool {
 		instanceConsumePool = kelleyRabbimqPool.NewConsumePool()
 		//instanceConsumePool.SetMaxConsumeChannel(100)
 		//err := instanceConsumePool.Connect("192.168.1.169", 5672, "admin", "admin")
-		err:=instanceConsumePool.ConnectVirtualHost("192.168.1.169", 5672, "temptest", "test123456", "/temptest1")
+		err := instanceConsumePool.Connect("rabbitmq.cupb.top", 5672, "admin", "Jian,Yin.2019")
+		//err:=instanceConsumePool.ConnectVirtualHost("192.168.1.169", 5672, "temptest", "test123456", "/temptest1")
 		if err != nil {
 			fmt.Println(err)
 		}
