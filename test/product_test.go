@@ -5,6 +5,7 @@ import (
 	kelleyRabbimqPool "gitee.com/tym_hmm/rabbitmq-pool-go"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestProduct(t *testing.T) {
@@ -19,7 +20,7 @@ func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 	oncePool.Do(func() {
 		instanceRPool = kelleyRabbimqPool.NewProductPool()
 		//err := instanceRPool.Connect("192.168.1.169", 5672, "admin", "admin")
-		err := instanceRPool.Connect("rabbitmq.cupb.top", 5672, "admin", "Jian,Yin.2019")
+		err := instanceRPool.Connect("mysql.cupb.top", 5672, "admin", "Jian,Yin.2019")
 
 		//err:=instanceRPool.ConnectVirtualHost("192.168.1.169", 5672, "temptest", "test123456", "/temptest1")
 		if err != nil {
@@ -43,7 +44,7 @@ func rund() {
 	//	fmt.Println(err)
 	//}()
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(num int) {
 			defer wg.Done()
@@ -54,7 +55,14 @@ func rund() {
 }
 
 func Send(num int) {
-	data := kelleyRabbimqPool.GetRabbitMqDataFormat("testChange31", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "route1", fmt.Sprintf("这里是数据%d", num))
+	data := kelleyRabbimqPool.GetRabbitMqDataFormat("testChange31", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "route", fmt.Sprintf("这里是数据%d", num))
+	err := instanceRPool.Push(data)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+func Sendexclusive(num int) {
+	data := kelleyRabbimqPool.GetRabbitMqDataFormat("testChange31", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "route-exclusive", fmt.Sprintf("这里是数据%d", num))
 	err := instanceRPool.Push(data)
 	if err != nil {
 		fmt.Println(err)
@@ -64,4 +72,9 @@ func Send(num int) {
 func TestSendOne(t *testing.T) {
 	initrabbitmq()
 	Send(1)
+}
+func TestSendexclusive(t *testing.T) {
+	initrabbitmq()
+	Sendexclusive(231)
+	time.Sleep(10 * time.Second)
 }

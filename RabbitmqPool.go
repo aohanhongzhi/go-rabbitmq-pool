@@ -4,9 +4,10 @@ import (
 	rand2 "crypto/rand"
 	"errors"
 	"fmt"
+	nested "github.com/aohanhongzhi/nested-logrus-formatter"
+	log "github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 	"hash/crc32"
-	"log"
 	"math"
 	"math/big"
 	"math/rand"
@@ -261,6 +262,7 @@ func NewConsumePool() *RabbitPool {
 }
 
 func newRabbitPool(clientType int) *RabbitPool {
+	nested.LogInit()
 	return &RabbitPool{
 		minRandomRetryTime: DEFAULT_RETRY_MIN_RANDOM_TIME,
 		maxRandomRetryTime: DEFAULT_RETRY_MAX_RADNOM_TIME,
@@ -523,7 +525,7 @@ func rDeclare(rconn *rConn, clientType int, channel *rChannel, exChangeName stri
 			argsQue["x-dead-letter-exchange"] = oldExChangeName
 			argsQue["x-dead-letter-routing-key"] = oldRoute
 		}
-		queue, err := newChannel.QueueDeclare(queueName, true, false, false, false, argsQue)
+		queue, err := newChannel.QueueDeclare(queueName, false, false, true, false, argsQue)
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("MQ注册队列失败:%s", err))
 		}
@@ -772,11 +774,26 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 		fmt.Println(err)
 		return NewRabbitMqError(RCODE_GET_CHANNEL_ERROR, "获取信道失败", err.Error())
 	} else {
+
+		var notice = make(chan amqp.Return, 1)
+		rChannel.ch.NotifyReturn(notice)
 		err = rChannel.ch.Publish(data.ExchangeName, data.Route, false, false, amqp.Publishing{
-			ContentType:  "text/plain",
-			Body:         []byte(data.Data),
-			DeliveryMode: amqp.Persistent, //持久化到磁盘
+			ContentType: "text/plain",
+			Body:        []byte(data.Data),
+			//DeliveryMode: amqp.Persistent, //持久化到磁盘
 		})
+
+		//go func(a chan amqp.Return) {
+		//	for v := range a {
+		//		log.Error(v.Body)
+		//	}
+		//}(notice)
+		go func() {
+			for v := range notice {
+				log.Error(v.Body)
+			}
+		}()
+
 		if err != nil { //如果消息发送失败, 重试发送
 			//pool.channelLock.Unlock()
 			//如果没有发送成功,休息两秒重发
