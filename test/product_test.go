@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	kelleyRabbimqPool "gitee.com/tym_hmm/rabbitmq-pool-go"
+	log "github.com/sirupsen/logrus"
 	"sync"
 	"testing"
 	"time"
@@ -76,6 +77,22 @@ func SendexHxb(num int) {
 	}
 }
 
+func SendexHxb1(num int) {
+	data := kelleyRabbimqPool.GetRabbitMqDataFormat("exHxb", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "xiaobai_one", fmt.Sprintf("这里是数据%d", num))
+	err := instanceRPool.Push(data)
+	if err != nil {
+		log.Error(err)
+	}
+}
+
+func SendexHxbTwo(num int) {
+	data := kelleyRabbimqPool.GetRabbitMqDataFormat("exHxb", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "xiaobai_two", fmt.Sprintf("这里是数据%d", num))
+	err := instanceRPool.Push(data)
+	if err != nil {
+		log.Error(err)
+	}
+}
+
 func TestSendOne(t *testing.T) {
 	initrabbitmq()
 	Send(1)
@@ -89,4 +106,11 @@ func TestSendexHxb(t *testing.T) {
 	initrabbitmq()
 	SendexHxb(231)
 	time.Sleep(10 * time.Second)
+}
+
+func TestSendexHxbTwo(t *testing.T) {
+	initrabbitmq()
+	SendexHxb(231)
+	SendexHxbTwo(2321)
+	time.Sleep(3 * time.Second)
 }
