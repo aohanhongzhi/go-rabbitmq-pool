@@ -777,7 +777,7 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 
 		var notice = make(chan amqp.Return, 1)
 		rChannel.ch.NotifyReturn(notice)
-		err = rChannel.ch.Publish(data.ExchangeName, data.Route, false, false, amqp.Publishing{
+		err = rChannel.ch.Publish(data.ExchangeName, data.Route, true, false, amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        []byte(data.Data),
 			//DeliveryMode: amqp.Persistent, //持久化到磁盘
@@ -790,7 +790,7 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 		//}(notice)
 		go func() {
 			for v := range notice {
-				log.Error(v.Body)
+				log.Errorf("错误原因 %v(%v),%v", v.ReplyText, v.ReplyCode, string(v.Body))
 			}
 		}()
 
@@ -799,7 +799,7 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 			//如果没有发送成功,休息两秒重发
 			time.Sleep(time.Second * 2)
 			sendTime++
-			log.Print("数据重发了", data)
+			log.Errorf("数据重发了 %v", data)
 			return rPush(pool, data, sendTime)
 		}
 
