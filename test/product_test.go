@@ -68,6 +68,13 @@ func Sendexclusive(num int) {
 		fmt.Println(err)
 	}
 }
+func SendexHxb(num int) {
+	data := kelleyRabbimqPool.GetRabbitMqDataFormat("exHxb", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "route-exclusive", fmt.Sprintf("这里是数据%d", num))
+	err := instanceRPool.Push(data)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
 
 func TestSendOne(t *testing.T) {
 	initrabbitmq()
@@ -76,5 +83,10 @@ func TestSendOne(t *testing.T) {
 func TestSendexclusive(t *testing.T) {
 	initrabbitmq()
 	Sendexclusive(231)
+	time.Sleep(10 * time.Second)
+}
+func TestSendexHxb(t *testing.T) {
+	initrabbitmq()
+	SendexHxb(231)
 	time.Sleep(10 * time.Second)
 }

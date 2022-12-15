@@ -18,10 +18,13 @@ func main() {
 	r.GET("/ping", func(c *gin.Context) {
 		// 发送消息到mq
 		value := c.Query("code")
-		if len(value) > 0 {
-			Send(value)
-		} else {
-			Send("1")
+
+		for i := 0; i < 10; i++ {
+			if len(value) > 0 {
+				Send(value)
+			} else {
+				Send("1")
+			}
 		}
 
 		c.JSON(200, gin.H{
@@ -38,7 +41,7 @@ func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 	oncePool.Do(func() {
 		instanceRPool = kelleyRabbimqPool.NewProductPool()
 		//err := instanceRPool.Connect("192.168.1.169", 5672, "admin", "admin")
-		err := instanceRPool.Connect("rabbitmq.cupb.top", 5672, "admin", "Jian,Yin.2019")
+		err := instanceRPool.Connect("mysql.cupb.top", 5672, "admin", "Jian,Yin.2019")
 
 		//err:=instanceRPool.ConnectVirtualHost("192.168.1.169", 5672, "temptest", "test123456", "/temptest1")
 		if err != nil {
@@ -49,7 +52,7 @@ func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 }
 
 func Send(num string) {
-	data := kelleyRabbimqPool.GetRabbitMqDataFormat("testChange31", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "route", fmt.Sprintf("这里是数据%v", num))
+	data := kelleyRabbimqPool.GetRabbitMqDataFormat("exHxb", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "route", fmt.Sprintf("这里是数据%v", num))
 	err := instanceRPool.Push(data)
 	if err != nil {
 		log.Error(err)
