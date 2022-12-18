@@ -105,7 +105,7 @@ func TestSendexclusive(t *testing.T) {
 func TestSendexHxb(t *testing.T) {
 	initrabbitmq()
 	SendexHxb(231)
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Second)
 }
 
 func TestSendexHxbTwo(t *testing.T) {

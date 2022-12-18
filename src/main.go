@@ -23,7 +23,7 @@ func main() {
 			if len(value) > 0 {
 				Send(value)
 			} else {
-				Send("1")
+				SendExchangeHxb(1)
 			}
 		}
 
@@ -58,5 +58,13 @@ func Send(num string) {
 		log.Error(err)
 	} else {
 		log.Println("消息发送成功", num)
+	}
+}
+
+func SendExchangeHxb(num int) {
+	data := kelleyRabbimqPool.GetRabbitMqDataFormat("exHxb", kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT, "", "jt-wechat", fmt.Sprintf("这里是数据%d", num))
+	err := instanceRPool.Push(data)
+	if err != nil {
+		fmt.Println(err)
 	}
 }

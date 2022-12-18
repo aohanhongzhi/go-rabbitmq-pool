@@ -537,7 +537,8 @@ func rDeclare(rconn *rConn, clientType int, channel *rChannel, exChangeName stri
 			argsQue["x-dead-letter-exchange"] = oldExChangeName
 			argsQue["x-dead-letter-routing-key"] = oldRoute
 		}
-		queue, err := newChannel.QueueDeclare(queueName, false, false, true, false, argsQue)
+		// 如果是 exclusive=true，那么无法再申明多次了， 这里要判断其他连接是否已经申明过了。 这里建议 exlusive设置为false。可以将 autoDelete设置成true去自动删除队列即可。
+		queue, err := newChannel.QueueDeclare(queueName, false, true, false, false, argsQue)
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("MQ注册队列失败:%s", err))
 		}
@@ -798,7 +799,7 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 
 		go func(a chan amqp.Return) {
 			for v := range a {
-				log.Errorf("错误原因 %v(%v),%v", v.ReplyText, v.ReplyCode, string(v.Body))
+				log.Errorf("错误原因 %v(%v) Exchange:%v ,RoutingKey:%v %v", v.ReplyText, v.ReplyCode, v.Exchange, v.RoutingKey, string(v.Body))
 
 			}
 		}(notice)

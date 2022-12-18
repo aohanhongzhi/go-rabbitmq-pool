@@ -15,7 +15,7 @@ func TestConsume(t *testing.T) {
 
 func Consume() {
 	nomrl := &kelleyRabbimqPool.ConsumeReceive{
-		ExchangeName: "testChange31", //队列名称
+		ExchangeName: "testChange31", //交换机名称
 		ExchangeType: kelleyRabbimqPool.EXCHANGE_TYPE_DIRECT,
 		Route:        "route-exclusive",
 		QueueName:    "test-return-exclusive",
@@ -55,6 +55,8 @@ func initConsumerabbitmq() *kelleyRabbimqPool.RabbitPool {
 		} else {
 			log.Info("监听消息连接池启动")
 		}
+		instanceConsumePool.SetMaxConsumeChannel(5)
+
 	})
 	return instanceConsumePool
 }
