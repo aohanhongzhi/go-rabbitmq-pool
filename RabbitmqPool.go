@@ -437,9 +437,54 @@ func (r *RabbitPool) getChannelQueue(conn *rConn, exChangeName string, exChangeT
 			return nil, err
 		}
 		rChannel.ch = channel.ch
+		addListener(rChannel)
 		r.channelPool[channelHashCode] = rChannel
 		return rChannel, nil
 	}
+}
+
+// 添加一个错误的监听器
+func addListener(rChannel *rChannel) {
+	// 添加监听器
+	var notice = make(chan amqp.Return)
+	rChannel.ch.NotifyReturn(notice)
+
+	//新开一个协程，回复的消息
+	resendTime := time.Second * 4
+	resendCollectTimer := time.NewTimer(resendTime) // 启动定时器
+
+	go func(a chan amqp.Return, ch *amqp.Channel) {
+		i := 0
+		for {
+			select { // 多路复用
+			case v, ok := <-a:
+				// ok 是否为true，用于判断是否读取到了有效数据
+				if ok {
+					if v.ReplyCode != 0 {
+						// TODO 失败的消息在这里处理
+					} else {
+						log.Errorf("消息ok=%v，消息发送失败[%v-%v]错误原因 %v(%v) %v", ok, v.Exchange, v.RoutingKey, v.ReplyText, v.ReplyCode, v.Body)
+					}
+				} else {
+					if i%50 == 0 {
+						//观察后期该channel还能不能接收处理消息，以及为啥关闭了呢
+						log.Errorf("go-channel异常,rabbitmq的消息异常rabbitmq-channel(%p) gochannel[%v]状态%v  %v", ch, a, ok, string(v.Body))
+						// 直接关闭
+						//return
+					}
+					time.Sleep(resendTime)
+				}
+			case <-resendCollectTimer.C:
+				log.Debugf("rabbitmq channel[%p]消息重发超时时间到了", ch)
+			default:
+				if i%1000 == 0 {
+					log.Infof(" %v rabbitmq失败监听器的channel[%p]通道[%p]没有数据", i, ch, a)
+				}
+				time.Sleep(resendTime)
+			}
+			i = i + 1
+		}
+	}(notice, rChannel.ch) // 这种叫匿名函数
 }
 
 /*
@@ -447,6 +492,13 @@ func (r *RabbitPool) getChannelQueue(conn *rConn, exChangeName string, exChangeT
 初始化连接池
 */
 func (r *RabbitPool) initConnections(isLock bool) error {
+	r.connectionLock.Lock()
+	// 关闭之前所有channel
+	for key, value := range r.channelPool {
+		log.Infof("清空之前连接的rabbitmq channel %p", value)
+		delete(r.channelPool, key)
+	}
+
 	r.connections[r.clientType] = []*rConn{}
 	var i int32 = 0
 	for i = 0; i < r.maxConnection; i++ {
@@ -457,6 +509,7 @@ func (r *RabbitPool) initConnections(isLock bool) error {
 			r.connections[r.clientType] = append(r.connections[r.clientType], &rConn{conn: itemConnection, index: i})
 		}
 	}
+	r.connectionLock.Unlock()
 	return nil
 }
 
@@ -573,6 +626,28 @@ func rConsume(pool *RabbitPool) {
 		retryConsume(pool)
 	}
 
+}
+
+func retryProduce(pool *RabbitPool) {
+	// TODO 获取最新连接看看有木有问题先！
+	log.Warnf("生产者连接 0秒后开始重新新建连接:[%d]\n", pool.pushCurrentRetry)
+	atomic.AddInt32(&pool.pushCurrentRetry, 1)
+	//time.Sleep(time.Second * 2)
+	_, err := rConnect(pool, true)
+	if err != nil {
+		log.Errorf("重新建立测试连接异常，再次重试！ %v", err)
+		retryProduce(pool)
+	} else {
+		//statusLock.Lock()
+		status = false
+		//statusLock.Unlock()
+		err = pool.initConnections(false)
+		if err != nil {
+			log.Error("重新建立连接还是错误！！！")
+		} else {
+			log.Infof("重新建立连接动作完成")
+		}
+	}
 }
 
 /*
@@ -773,6 +848,19 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 
 /*
 *
+重连并且发送消息
+*/
+func ReconnectAndPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
+	if sendTime >= 3 {
+		// 网络不好就需要再等等
+		time.Sleep(time.Second * time.Duration(sendTime*2))
+	}
+	retryProduce(pool)
+	return rPush(pool, data, sendTime)
+}
+
+/*
+*
 发送消息
 */
 func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
@@ -780,7 +868,9 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 		return NewRabbitMqError(RCODE_PUSH_MAX_ERROR, "重试超过最大次数", "")
 	}
 	pool.channelLock.Lock()
+	pool.connectionLock.Lock()
 	conn := pool.getConnection()
+	pool.connectionLock.Unlock()
 	rChannel, err := pool.getChannelQueue(conn, data.ExchangeName, data.ExchangeType, data.QueueName, data.Route, false, 0)
 	pool.channelLock.Unlock()
 	if err != nil {
@@ -788,33 +878,43 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 		return NewRabbitMqError(RCODE_GET_CHANNEL_ERROR, "获取信道失败", err.Error())
 	} else {
 
-		var notice = make(chan amqp.Return, 1)
-		rChannel.ch.NotifyReturn(notice)
-
 		err = rChannel.ch.Publish(data.ExchangeName, data.Route, true, false, amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        []byte(data.Data),
 			//DeliveryMode: amqp.Persistent, //持久化到磁盘
 		})
 
-		go func(a chan amqp.Return) {
-			for v := range a {
-				log.Errorf("错误原因 %v(%v) Exchange:%v ,RoutingKey:%v %v", v.ReplyText, v.ReplyCode, v.Exchange, v.RoutingKey, string(v.Body))
-
-			}
-		}(notice)
-
 		if err != nil { //如果消息发送失败, 重试发送
 			//pool.channelLock.Unlock()
 			//如果没有发送成功,休息两秒重发
-			time.Sleep(time.Second * 2)
-			sendTime++
-			log.Errorf("数据重发了 %v", data)
-			return rPush(pool, data, sendTime)
+			if strings.Contains(err.Error(), "channel/connection is not open") {
+				log.Errorf("生产者获取发送消息连接失败,连接 %p %v 池 %p  重新发送 消息 %v", conn.conn, err, pool, data.Data)
+				sendTime++
+				return ReconnectAndPush(pool, data, sendTime)
+			} else {
+				//如果没有发送成功,休息两秒重发
+				time.Sleep(time.Second * 2)
+				sendTime++
+				log.Errorf("数据重发了 %v %+v", err, data)
+				return rPush(pool, data, sendTime)
+			}
 		}
 
 	}
 	return nil
+}
+
+/*
+*
+发送消息
+*/
+func ReconnectAndPushQueue(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
+	if sendTime >= 3 {
+		// 网络不好就需要再等等
+		time.Sleep(time.Second * time.Duration(sendTime*2))
+	}
+	retryProduce(pool)
+	return rPushQueue(pool, data, sendTime)
 }
 
 /*
@@ -826,7 +926,9 @@ func rPushQueue(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqErr
 		return NewRabbitMqError(RCODE_PUSH_MAX_ERROR, "重试超过最大次数", "")
 	}
 	pool.channelLock.Lock()
+	pool.connectionLock.Lock()
 	conn := pool.getConnection()
+	pool.connectionLock.Unlock()
 	rChannel, err := pool.getChannelQueue(conn, data.ExchangeName, data.ExchangeType, data.QueueName, data.Route, false, 0)
 	pool.channelLock.Unlock()
 	if err != nil {
@@ -834,29 +936,26 @@ func rPushQueue(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqErr
 		return NewRabbitMqError(RCODE_GET_CHANNEL_ERROR, "获取信道失败", err.Error())
 	} else {
 
-		var notice = make(chan amqp.Return, 1)
-		rChannel.ch.NotifyReturn(notice)
-
 		err = rChannel.ch.Publish(data.ExchangeName, data.QueueName, false, false, amqp.Publishing{
 			ContentType:  "text/plain",
 			Body:         []byte(data.Data),
 			DeliveryMode: amqp.Persistent, //持久化到磁盘
 		})
 
-		go func(a chan amqp.Return) {
-			for v := range a {
-				log.Errorf("错误原因 %v(%v),%v", v.ReplyText, v.ReplyCode, string(v.Body))
-
-			}
-		}(notice)
-
 		if err != nil { //如果消息发送失败, 重试发送
 			//pool.channelLock.Unlock()
 			//如果没有发送成功,休息两秒重发
-			time.Sleep(time.Second * 2)
-			sendTime++
-			log.Errorf("数据重发了 %v", data)
-			return rPushQueue(pool, data, sendTime)
+			if strings.Contains(err.Error(), "channel/connection is not open") {
+				log.Errorf("生产者获取发送消息连接失败,连接 %p %v 池 %p  重新发送 消息 %v", conn.conn, err, pool, data.Data)
+				sendTime++
+				return ReconnectAndPushQueue(pool, data, sendTime)
+			} else {
+				//如果没有发送成功,休息两秒重发
+				time.Sleep(time.Second * 2)
+				sendTime++
+				log.Errorf("数据重发了 %v %+v", err, data)
+				return rPushQueue(pool, data, sendTime)
+			}
 		}
 
 	}
