@@ -23,7 +23,7 @@ func SendExchangeHxb(num int) {
 
 func TestSendExchangeTopic(t *testing.T) {
 	initrabbitmq()
-	data := kelleyRabbimqPool.GetRabbitMqDataFormat("register-test-exchange", kelleyRabbimqPool.EXCHANGE_TYPE_TOPIC, "", "jt-wechat", fmt.Sprintf("这里是数据%d", 1))
+	data := kelleyRabbimqPool.GetRabbitMqDataFormat("jt-register-test-exchange", kelleyRabbimqPool.EXCHANGE_TYPE_TOPIC, "", "jt-register-test", fmt.Sprintf("这里是数据%d", 1))
 	err := instanceRPool.Push(data)
 	if err != nil {
 		fmt.Println(err)

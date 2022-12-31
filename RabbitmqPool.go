@@ -398,6 +398,9 @@ func (r *RabbitPool) Push(data *RabbitMqData) *RabbitMqError {
 发送消息
 */
 func (r *RabbitPool) PushQueue(data *RabbitMqData) *RabbitMqError {
+	if len(data.QueueName) == 0 {
+		log.Errorf("队列名字不能为空%+v", data)
+	}
 	return rPushQueue(r, data, 1)
 }
 
