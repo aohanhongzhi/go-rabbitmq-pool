@@ -663,18 +663,25 @@ func retryProduce(pool *RabbitPool) {
 重连处理
 */
 func retryConsume(pool *RabbitPool) {
-	fmt.Printf("2秒后开始重试:[%d]\n", pool.consumeCurrentRetry)
-	atomic.AddInt32(&pool.consumeCurrentRetry, 1)
-	time.Sleep(time.Second * 2)
-	_, err := rConnect(pool, true)
-	if err != nil {
-		retryConsume(pool)
+
+	if pool.consumeCurrentRetry < pool.consumeMaxRetry {
+		timeSecond := pool.consumeCurrentRetry * 2
+		log.Warnf("%v秒后开始第[%d]次重试", timeSecond, pool.consumeCurrentRetry)
+		atomic.AddInt32(&pool.consumeCurrentRetry, 1)
+
+		time.Sleep(time.Second * time.Duration(timeSecond))
+		_, err := rConnect(pool, true)
+		if err != nil {
+			retryConsume(pool)
+		} else {
+			statusLock.Lock()
+			status = false
+			statusLock.Unlock()
+			_ = pool.initConnections(false)
+			rConsume(pool)
+		}
 	} else {
-		statusLock.Lock()
-		status = false
-		statusLock.Unlock()
-		_ = pool.initConnections(false)
-		rConsume(pool)
+		log.Errorf("消费者超过最大重试次数[%v]，无法继续了。", pool.consumeMaxRetry)
 	}
 
 }
