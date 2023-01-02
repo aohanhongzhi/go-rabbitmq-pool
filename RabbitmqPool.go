@@ -2,11 +2,12 @@ package kelleyRabbimqPool
 
 import (
 	rand2 "crypto/rand"
-	"errors"
 	"fmt"
 	nested "github.com/aohanhongzhi/nested-logrus-formatter"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/streadway/amqp"
+	// "github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"hash/crc32"
 	"math"
 	"math/big"
@@ -554,7 +555,8 @@ func rConnect(r *RabbitPool, islock bool) (*amqp.Connection, error) {
 func rCreateChannel(conn *rConn) (*amqp.Channel, error) {
 	ch, err := conn.conn.Channel()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Create Connect Channel Error: %s", err.Error()))
+		// return nil, errors.New(fmt.Sprintf("Create Connect Channel Error: %s", err.Error()))
+		return nil, errors.Wrap(err, "Create Connect Channel Error: ")
 	}
 	return ch, nil
 }
@@ -583,7 +585,8 @@ func rDeclare(rconn *rConn, clientType int, channel *rChannel, exChangeName stri
 	if len(exChangeName) > 0 {
 		err := newChannel.ExchangeDeclare(exChangeName, exChangeType, true, false, false, false, nil)
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("MQ注册交换机失败:%s", err))
+			// return nil, errors.New(fmt.Sprintf("MQ注册交换机失败:%s", err))
+			return nil, errors.Wrap(err, "MQ注册交换机失败")
 		}
 	}
 
@@ -596,11 +599,13 @@ func rDeclare(rconn *rConn, clientType int, channel *rChannel, exChangeName stri
 		// 如果是 exclusive=true，那么无法再申明多次了， 这里要判断其他连接是否已经申明过了。 这里建议 exlusive设置为false。可以将 autoDelete设置成true去自动删除队列即可。
 		queue, err := newChannel.QueueDeclare(queueName, false, true, false, false, argsQue)
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("MQ注册队列失败:%s", err))
+			// return nil, errors.New(fmt.Sprintf("MQ注册队列失败:%s", err))
+			return nil, errors.Wrap(err, "MQ注册队列失败")
 		}
 		err = newChannel.QueueBind(queue.Name, route, exChangeName, false, nil)
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("MQ绑定队列失败:%s", err))
+			// return nil, errors.New(fmt.Sprintf("MQ绑定队列失败:%s", err))
+			return nil, errors.Wrap(err, "MQ绑定队列失败")
 		}
 	}
 	channel.ch = newChannel
