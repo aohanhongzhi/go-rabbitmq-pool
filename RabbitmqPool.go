@@ -236,6 +236,8 @@ type RabbitPool struct {
 	consumeCurrentRetry int32             //当前重连次数
 	pushCurrentRetry    int32             //当前推送重连交数
 
+	SendFailListener func(a amqp.Return) // 发送失败的监听处理函数
+
 	clientType int //客户端类型 生产者或消费者 默认为生产者
 
 	errorChanel chan *amqp.Error //错误捕捉channel
@@ -443,14 +445,16 @@ func (r *RabbitPool) getChannelQueue(conn *rConn, exChangeName string, exChangeT
 			return nil, err
 		}
 		rChannel.ch = channel.ch
-		addListener(rChannel)
+
+		addListener(rChannel, r.SendFailListener)
+
 		r.channelPool[channelHashCode] = rChannel
 		return rChannel, nil
 	}
 }
 
 // 添加一个错误的监听器
-func addListener(rChannel *rChannel) {
+func addListener(rChannel *rChannel, callback func(a amqp.Return)) {
 	// 添加监听器
 	var notice = make(chan amqp.Return)
 	rChannel.ch.NotifyReturn(notice)
@@ -459,7 +463,7 @@ func addListener(rChannel *rChannel) {
 	resendTime := time.Second * 4
 	resendCollectTimer := time.NewTimer(resendTime) // 启动定时器
 
-	go func(a chan amqp.Return, ch *amqp.Channel) {
+	go func(a chan amqp.Return, ch *amqp.Channel, callback func(a amqp.Return)) {
 		i := 0
 		for {
 			select { // 多路复用
@@ -467,16 +471,18 @@ func addListener(rChannel *rChannel) {
 				// ok 是否为true，用于判断是否读取到了有效数据
 				if ok {
 					if v.ReplyCode != 0 {
-						// TODO 失败的消息在这里处理
+						callback(v)
 					} else {
 						log.Errorf("消息ok=%v，消息发送失败[%v-%v]错误原因 %v(%v) %v", ok, v.Exchange, v.RoutingKey, v.ReplyText, v.ReplyCode, v.Body)
 					}
 				} else {
 					if i%50 == 0 {
 						//观察后期该channel还能不能接收处理消息，以及为啥关闭了呢
-						log.Errorf("go-channel异常,rabbitmq的消息异常rabbitmq-channel(%p) gochannel[%v]状态%v  %v", ch, a, ok, string(v.Body))
+
+						log.Errorf("go-channel异常,rabbitmq的消息异常rabbitmq-channel(%p)关闭状态: %v , gochannel[%v]状态%v  %v", ch, ch.IsClosed(), a, ok, string(v.Body))
+						// 打印所有发送的rabbitmq channel
 						// 直接关闭
-						//return
+						return
 					}
 					time.Sleep(resendTime)
 				}
@@ -490,7 +496,7 @@ func addListener(rChannel *rChannel) {
 			}
 			i = i + 1
 		}
-	}(notice, rChannel.ch) // 这种叫匿名函数
+	}(notice, rChannel.ch, callback) // 这种叫匿名函数
 }
 
 /*
