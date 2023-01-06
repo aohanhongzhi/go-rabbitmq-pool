@@ -1,11 +1,14 @@
 ## rabbitmq 连接池channel复用
 
+本库基于
+https://gitee.com/tym_hmm/rabbitmq-pool-go
+开发，拓展了一些特性，增加了发送失败的监听器，重发机制的优化，生产更加稳定
+
 开发语言 golang
 依赖库
 
-go get -u gitee.com/tym_hmm/rabbitmq-pool-go
 ```
-go get -u gitee.com/tym_hmm/rabbitmq-pool-go
+go get -u gitee.com/aohanhongzhi/go-rabbitmq-pool
 ```
 
 > 已在线上生产环镜运行， 5200W请求 qbs 3000 时， 连接池显示无压力<br>
