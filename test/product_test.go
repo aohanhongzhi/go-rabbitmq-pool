@@ -22,7 +22,7 @@ func initrabbitmq() *kelleyRabbimqPool.RabbitPool {
 		instanceRPool = kelleyRabbimqPool.NewProductPool()
 		//err := instanceRPool.Connect("192.168.1.169", 5672, "admin", "admin")
 		//err := instanceRPool.Connect("mysql.cupb.top", 5672, "admin", "Jian,Yin.2019")
-		err := instanceRPool.Connect("rabbitmq.cupb.top", 5672, "admin", "Jian,Yin.2019")
+		err := instanceRPool.Connect("mysql.cupb.top", 5672, "admin", "Jian,Yin.2019")
 
 		//err:=instanceRPool.ConnectVirtualHost("192.168.1.169", 5672, "temptest", "test123456", "/temptest1")
 		if err != nil {
