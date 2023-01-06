@@ -505,6 +505,8 @@ func addListener(rChannel *rChannel, callback func(a amqp.Return)) {
 */
 func (r *RabbitPool) initConnections(isLock bool) error {
 	r.connectionLock.Lock()
+	defer r.connectionLock.Unlock() // 这里需要写在上面，下面有多处return，否则提前返回可能导致没有手动释放锁
+
 	// 关闭之前所有channel
 	for key, value := range r.channelPool {
 		if r.clientType == RABBITMQ_TYPE_CONSUME {
@@ -525,7 +527,6 @@ func (r *RabbitPool) initConnections(isLock bool) error {
 			r.connections[r.clientType] = append(r.connections[r.clientType], &rConn{conn: itemConnection, index: i})
 		}
 	}
-	r.connectionLock.Unlock()
 	return nil
 }
 
