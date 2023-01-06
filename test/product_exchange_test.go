@@ -2,7 +2,7 @@ package test
 
 import (
 	"fmt"
-	kelleyRabbimqPool "gitee.com/tym_hmm/rabbitmq-pool-go"
+	kelleyRabbimqPool "gitee.com/aohanhongzhi/go-rabbitmq-pool"
 	"testing"
 	"time"
 )
