@@ -23,10 +23,11 @@ var (
 	ACK_DATA_NIL = errors.New("ack data nil")
 )
 
+var CONSUMER_RETRY_INTERVAL = []int{1, 10, 100, 5 * 60, 15 * 60, 59 * 60, 3 * 60 * 60, 12 * 60 * 60, 24 * 60 * 60, 48 * 60 * 60} //消费者重试间隔
+
 const (
 	DEFAULT_MAX_CONNECTION      = 5  //rabbitmq tcp 最大连接数
 	DEFAULT_MAX_CONSUME_CHANNEL = 25 //最大消费channel数(一般指消费者)   轮询也是按照channel来计算的，如果有25个channel那么就得消费25个消息之后才能轮到下一个节点。因此建议设置小一点。
-	DEFAULT_MAX_CONSUME_RETRY   = 5  //消费者断线重连最大次数
 	DEFAULT_PUSH_MAX_TIME       = 5  //最大重发次数
 
 	//轮循-连接池负载算法
@@ -278,7 +279,7 @@ func newRabbitPool(clientType int) *RabbitPool {
 		pushMaxTime:         DEFAULT_PUSH_MAX_TIME,
 		connectionBalance:   LOAD_BALANCE_ROUND,
 		connectionIndex:     0,
-		consumeMaxRetry:     DEFAULT_MAX_CONSUME_RETRY,
+		consumeMaxRetry:     int32(len(CONSUMER_RETRY_INTERVAL)),
 		consumeCurrentRetry: 0,
 		pushCurrentRetry:    0,
 		connectStatus:       false,
@@ -713,7 +714,7 @@ func retryProduce(pool *RabbitPool) {
 func retryConsume(pool *RabbitPool) {
 
 	if pool.consumeCurrentRetry < pool.consumeMaxRetry {
-		timeSecond := pool.consumeCurrentRetry * 2
+		timeSecond := CONSUMER_RETRY_INTERVAL[pool.consumeCurrentRetry]
 		log.Warnf("%v秒后开始第[%d]次重试", timeSecond, pool.consumeCurrentRetry)
 		atomic.AddInt32(&pool.consumeCurrentRetry, 1)
 
