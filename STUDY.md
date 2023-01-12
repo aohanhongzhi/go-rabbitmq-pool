@@ -1,3 +1,10 @@
+
+## 代理
+
+```
+GOPROXY=https://goproxy.cn,direct
+```
+
 # rabbitmq官方golang教程
 
 github.com/rabbitmq/amqp091-go
