@@ -15,3 +15,10 @@ github.com/rabbitmq/amqp091-go
 "github.com/pkg/errors"
 ```
 使用 `%+v` 就可以展示出堆栈信息
+
+# 发布
+
+```shell
+git tag v0.0.2
+git push --tags 
+```
