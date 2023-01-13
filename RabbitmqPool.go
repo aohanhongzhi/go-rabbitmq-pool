@@ -491,7 +491,7 @@ func addListener(rChannel *rChannel, callback func(a amqp.Return)) {
 				log.Debugf("rabbitmq channel[%p]消息重发超时时间到了", ch)
 			default:
 				if i%1000 == 0 {
-					log.Infof(" %v rabbitmq失败监听器的channel[%p]通道[%p]没有数据", i, ch, a)
+					log.Debugf(" %v rabbitmq失败监听器的channel[%p]通道[%p]没有数据", i, ch, a)
 				}
 				time.Sleep(resendTime)
 			}
