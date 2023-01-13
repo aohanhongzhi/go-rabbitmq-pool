@@ -687,7 +687,7 @@ func rConsume(pool *RabbitPool) {
 
 func retryProduce(pool *RabbitPool) {
 	// TODO 获取最新连接看看有木有问题先！
-	log.Warnf("生产者连接 1秒后开始重新新建连接:[%d]\n", pool.pushCurrentRetry)
+	log.Warnf("生产者连接 1秒后开始重新新建连接:[%d]", pool.pushCurrentRetry)
 	atomic.AddInt32(&pool.pushCurrentRetry, 1)
 	time.Sleep(time.Second * 1)
 	_, err := rConnect(pool, true)
@@ -906,9 +906,9 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 		case e := <-notifyClose:
 			if receive.EventFail != nil {
 				if e != nil {
-					receive.EventFail(RCODE_CONNECTION_ERROR, NewRabbitMqError(RCODE_CONNECTION_ERROR, fmt.Sprintf("消息处理中断: queue:%s\n", receive.QueueName), e.Error()), nil)
+					receive.EventFail(RCODE_CONNECTION_ERROR, NewRabbitMqError(RCODE_CONNECTION_ERROR, fmt.Sprintf("消息处理中断: queue:%s", receive.QueueName), e.Error()), nil)
 				} else {
-					receive.EventFail(RCODE_CONNECTION_ERROR, NewRabbitMqError(RCODE_CONNECTION_ERROR, fmt.Sprintf("消息处理中断: queue:%s\n", receive.QueueName), "未知错误"), nil)
+					receive.EventFail(RCODE_CONNECTION_ERROR, NewRabbitMqError(RCODE_CONNECTION_ERROR, fmt.Sprintf("消息处理中断: queue:%s", receive.QueueName), "未知错误"), nil)
 				}
 			}
 
