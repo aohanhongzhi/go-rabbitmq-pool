@@ -456,48 +456,53 @@ func (r *RabbitPool) getChannelQueue(conn *rConn, exChangeName string, exChangeT
 
 // 添加一个错误的监听器
 func addListener(rChannel *rChannel, callback func(a amqp.Return)) {
-	// 添加监听器
-	var notice = make(chan amqp.Return)
-	rChannel.ch.NotifyReturn(notice)
 
-	//新开一个协程，回复的消息
-	resendTime := time.Second * 4
-	resendCollectTimer := time.NewTimer(resendTime) // 启动定时器
+	if callback != nil {
+		// 添加监听器
+		var notice = make(chan amqp.Return)
+		rChannel.ch.NotifyReturn(notice)
 
-	go func(a chan amqp.Return, ch *amqp.Channel, callback func(a amqp.Return)) {
-		i := 0
-		for {
-			select { // 多路复用
-			case v, ok := <-a:
-				// ok 是否为true，用于判断是否读取到了有效数据
-				if ok {
-					if v.ReplyCode != 0 {
-						callback(v)
+		//新开一个协程，回复的消息
+		resendTime := time.Second * 4
+		resendCollectTimer := time.NewTimer(resendTime) // 启动定时器
+
+		go func(a chan amqp.Return, ch *amqp.Channel, callback func(a amqp.Return)) {
+			i := 0
+			for {
+				select { // 多路复用
+				case v, ok := <-a:
+					// ok 是否为true，用于判断是否读取到了有效数据
+					if ok {
+						if v.ReplyCode != 0 {
+							callback(v)
+						} else {
+							log.Errorf("消息ok=%v，消息发送失败[%v-%v]错误原因 %v(%v) %v", ok, v.Exchange, v.RoutingKey, v.ReplyText, v.ReplyCode, v.Body)
+						}
 					} else {
-						log.Errorf("消息ok=%v，消息发送失败[%v-%v]错误原因 %v(%v) %v", ok, v.Exchange, v.RoutingKey, v.ReplyText, v.ReplyCode, v.Body)
-					}
-				} else {
-					if i%50 == 0 {
-						//观察后期该channel还能不能接收处理消息，以及为啥关闭了呢
+						if i%50 == 0 {
+							//观察后期该channel还能不能接收处理消息，以及为啥关闭了呢
 
-						log.Errorf("go-channel异常,rabbitmq的消息异常rabbitmq-channel(%p)关闭状态: %v , gochannel[%v]状态%v  %v", ch, ch.IsClosed(), a, ok, string(v.Body))
-						// 打印所有发送的rabbitmq channel
-						// 直接关闭
-						return
+							log.Errorf("go-channel异常,rabbitmq的消息异常rabbitmq-channel(%p)关闭状态: %v , gochannel[%v]状态%v  %v", ch, ch.IsClosed(), a, ok, string(v.Body))
+							// 打印所有发送的rabbitmq channel
+							// 直接关闭
+							return
+						}
+						time.Sleep(resendTime)
+					}
+				case <-resendCollectTimer.C:
+					log.Debugf("rabbitmq channel[%p]消息重发超时时间到了", ch)
+				default:
+					if i%1000 == 0 {
+						log.Debugf(" %v rabbitmq失败监听器的channel[%p]通道[%p]没有数据", i, ch, a)
 					}
 					time.Sleep(resendTime)
 				}
-			case <-resendCollectTimer.C:
-				log.Debugf("rabbitmq channel[%p]消息重发超时时间到了", ch)
-			default:
-				if i%1000 == 0 {
-					log.Debugf(" %v rabbitmq失败监听器的channel[%p]通道[%p]没有数据", i, ch, a)
-				}
-				time.Sleep(resendTime)
+				i = i + 1
 			}
-			i = i + 1
-		}
-	}(notice, rChannel.ch, callback) // 这种叫匿名函数
+		}(notice, rChannel.ch, callback) // 这种叫匿名函数
+	} else {
+		log.Warnf("%p addListener: callback is nil", rChannel)
+	}
 }
 
 /*
