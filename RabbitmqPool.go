@@ -416,11 +416,23 @@ func (r *RabbitPool) PushQueue(data *RabbitMqData) *RabbitMqError {
 1.这里可以做负载算法, 默认使用轮循
 */
 func (r *RabbitPool) getConnection() *rConn {
+	if len(r.connections[r.clientType]) == 0 {
+		// 重新创建新的连接
+		r.initConnections(false)
+	}
+	r.connectionLock.Lock()
+	defer r.connectionLock.Unlock() // 这里需要写在上面，下面有多处return，否则提前返回可能导致没有手动释放锁
+
 	changeConnectionIndex := r.connectionIndex
 	currentIndex := r.rabbitLoadBalance.RoundRobin(changeConnectionIndex, r.maxConnection)
 	currentNum := currentIndex - changeConnectionIndex
 	atomic.AddInt32(&r.connectionIndex, currentNum)
-	return r.connections[r.clientType][r.connectionIndex]
+
+	if int(r.connectionIndex) < len(r.connections[r.clientType]) {
+		return r.connections[r.clientType][r.connectionIndex]
+	} else {
+		return r.connections[r.clientType][0]
+	}
 }
 
 /*
@@ -777,9 +789,7 @@ func setConnectError(pool *RabbitPool, code int, message string) {
 func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 	//获取请求连接
 	closeFlag := false
-	pool.connectionLock.Lock()
 	conn := pool.getConnection()
-	pool.connectionLock.Unlock()
 	//生成处理channel 根据最大channel数处理
 	channel, err := rCreateChannel(conn)
 	if err != nil {
@@ -953,9 +963,7 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 		return NewRabbitMqError(RCODE_PUSH_MAX_ERROR, "重试超过最大次数", "")
 	}
 	pool.channelLock.Lock()
-	pool.connectionLock.Lock()
 	conn := pool.getConnection()
-	pool.connectionLock.Unlock()
 	rChannel, err := pool.getChannelQueue(conn, data.ExchangeName, data.ExchangeType, data.QueueName, data.Route, false, 0)
 	pool.channelLock.Unlock()
 	if err != nil {
@@ -1014,9 +1022,7 @@ func rPushQueue(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqErr
 		return NewRabbitMqError(RCODE_PUSH_MAX_ERROR, "重试超过最大次数", "")
 	}
 	pool.channelLock.Lock()
-	pool.connectionLock.Lock()
 	conn := pool.getConnection()
-	pool.connectionLock.Unlock()
 	rChannel, err := pool.getChannelQueue(conn, data.ExchangeName, data.ExchangeType, data.QueueName, data.Route, false, 0)
 	pool.channelLock.Unlock()
 	if err != nil {
