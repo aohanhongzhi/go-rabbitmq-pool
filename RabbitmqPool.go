@@ -571,7 +571,7 @@ func (r *RabbitPool) Close() {
 		}
 	}
 
-	log.Errorf("关闭了 %v 个Channel", len(r.channelPool))
+	log.Warnf("关闭了 %v 个Channel", len(r.channelPool))
 
 	for _, conn1 := range r.connections {
 		for _, conn2 := range conn1 {
@@ -583,7 +583,7 @@ func (r *RabbitPool) Close() {
 		}
 	}
 
-	log.Errorf("关闭了 %v 个Connection", len(r.connections))
+	log.Warnf("关闭了 %v 个Connection", len(r.connections))
 
 }
 
