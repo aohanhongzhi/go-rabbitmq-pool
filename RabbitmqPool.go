@@ -5,9 +5,6 @@ import (
 	rand2 "crypto/rand"
 
 	"fmt"
-	"github.com/pkg/errors"
-	amqp "github.com/rabbitmq/amqp091-go"
-	log "github.com/sirupsen/logrus"
 	"hash/crc32"
 	"math"
 	"math/big"
@@ -17,6 +14,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/pkg/errors"
+	amqp "github.com/rabbitmq/amqp091-go"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -502,10 +503,10 @@ func addListener(rChannel *rChannel, callback func(a amqp.Return)) {
 						time.Sleep(resendTime)
 					}
 				case <-resendCollectTimer.C:
-					log.Debugf("rabbitmq channel[%p]消息重发超时时间到了", ch)
+					log.Tracef("rabbitmq channel[%p]消息重发超时时间到了", ch)
 				default:
 					if i%1000 == 0 {
-						log.Debugf(" %v rabbitmq失败监听器的channel[%p]通道[%p]没有数据", i, ch, a)
+						log.Tracef(" %v rabbitmq失败监听器的channel[%p]通道[%p]没有数据", i, ch, a)
 					}
 					time.Sleep(resendTime)
 				}
