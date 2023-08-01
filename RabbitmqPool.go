@@ -419,7 +419,10 @@ func (r *RabbitPool) PushQueue(data *RabbitMqData) *RabbitMqError {
 func (r *RabbitPool) getConnection() *rConn {
 	if len(r.connections[r.clientType]) == 0 {
 		// 重新创建新的连接
-		r.initConnections(false)
+		err := r.initConnections(false)
+		if err != nil {
+			errors.New(err.Error())
+		}
 	}
 	r.connectionLock.Lock()
 	defer r.connectionLock.Unlock() // 这里需要写在上面，下面有多处return，否则提前返回可能导致没有手动释放锁
