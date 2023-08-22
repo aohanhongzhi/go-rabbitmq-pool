@@ -24,7 +24,7 @@ var (
 	ACK_DATA_NIL = errors.New("ack data nil")
 )
 
-var CONSUMER_RETRY_INTERVAL = []int{1, 10, 100, 5 * 60, 15 * 60, 59 * 60, 3 * 60 * 60, 12 * 60 * 60, 24 * 60 * 60, 48 * 60 * 60} //消费者重试间隔
+var CONSUMER_RETRY_INTERVAL = []int{3, 15, 30, 2 * 60, 5 * 60, 10 * 60, 30 * 60, 1 * 60 * 60, 3 * 60 * 60, 12 * 60 * 60, 24 * 60 * 60, 48 * 60 * 60} //消费者重试间隔
 
 const (
 	DEFAULT_MAX_CONNECTION      = 5  //rabbitmq tcp 最大连接数
@@ -546,6 +546,7 @@ func (r *RabbitPool) initConnections(isLock bool) error {
 		if err != nil {
 			return err
 		} else {
+			r.consumeCurrentRetry = 0 // 因为已经重试成功，所以重置为0，方便下次重试。
 			r.connections[r.clientType] = append(r.connections[r.clientType], &rConn{conn: itemConnection, index: i})
 		}
 	}

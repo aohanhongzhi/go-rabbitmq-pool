@@ -19,6 +19,6 @@ github.com/rabbitmq/amqp091-go
 # 发布
 
 ```shell
-git tag v0.0.2
+git tag v0.0.8
 git push --tags 
 ```
