@@ -24,7 +24,7 @@ var (
 	ACK_DATA_NIL = errors.New("ack data nil")
 )
 
-var CONSUMER_RETRY_INTERVAL = []int{3, 15, 30, 2 * 60, 5 * 60, 10 * 60, 30 * 60, 1 * 60 * 60, 3 * 60 * 60, 12 * 60 * 60, 24 * 60 * 60, 48 * 60 * 60} //消费者重试间隔
+var CONSUMER_RETRY_INTERVAL = []int{3, 15, 30, 1 * 60, 2 * 60, 5 * 60, 10 * 60, 30 * 60, 1 * 60 * 60, 3 * 60 * 60, 12 * 60 * 60, 24 * 60 * 60, 48 * 60 * 60} //消费者重试间隔
 
 const (
 	DEFAULT_MAX_CONNECTION      = 5  //rabbitmq tcp 最大连接数
