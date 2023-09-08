@@ -392,10 +392,7 @@ func (r *RabbitPool) RunConsume() error {
 	return nil
 }
 
-/*
-*
-发送消息
-*/
+// Push 发送消息
 func (r *RabbitPool) Push(data *RabbitMqData) *RabbitMqError {
 	return rPush(r, data, 1)
 }
@@ -709,7 +706,7 @@ func rConsume(pool *RabbitPool) {
 
 func retryProduce(pool *RabbitPool) {
 	// TODO 获取最新连接看看有木有问题先！
-	log.Warnf("生产者连接 1秒后开始重新新建连接:[%d]", pool.pushCurrentRetry)
+	log.Warnf("生产者连接将在1秒后开始重新新建连接:[%d]", pool.pushCurrentRetry)
 	atomic.AddInt32(&pool.pushCurrentRetry, 1)
 	time.Sleep(time.Second * 1)
 	_, err := rConnect(pool, true)
@@ -945,13 +942,15 @@ func consumeTask(num int32, pool *RabbitPool, receive *ConsumeReceive) {
 	}
 }
 
-/*
-*
-重连并且发送消息
-*/
+// ReconnectAndPush 重连并且发送消息
 func ReconnectAndPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
+	log.Infof("重新连接并且发送消息，当前重试次数 %v次", sendTime)
 	if sendTime >= 3 {
 		// 网络不好就需要再等等
+		if sendTime > 60 {
+			sendTime = 60 // 最大2秒
+		}
+		log.Infof("重新连接并且发送消息，当前等待时间 %vs", sendTime*2)
 		time.Sleep(time.Second * time.Duration(sendTime*2))
 	}
 	retryProduce(pool)
@@ -993,8 +992,8 @@ func rPush(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqError {
 				sendTime++
 				return ReconnectAndPush(pool, data, sendTime)
 			} else {
-				//如果没有发送成功,休息两秒重发
-				time.Sleep(time.Second * 2)
+				//如果没有发送成功,休息3秒重发
+				time.Sleep(time.Second * 3)
 				sendTime++
 				log.Errorf("数据重发了 %v %+v", err, data)
 				return rPush(pool, data, sendTime)
