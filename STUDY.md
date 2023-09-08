@@ -9,6 +9,9 @@ GOPROXY=https://goproxy.cn,direct
 
 github.com/rabbitmq/amqp091-go
 
+https://learnku.com/docs/go-szgbf/1.0/working-mode-of-rabbitmq-working-mode/8738
+
+
 # 第三方异常封装errors
 
 ```
