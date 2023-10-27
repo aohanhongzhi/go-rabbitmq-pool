@@ -136,3 +136,10 @@ nomrl := &rabbitmq.ConsumeReceive{
 |504|连接失败|
 |506|信道创建失败|
 |507|超过最大重试次数|
+
+# 发布
+
+```shell
+git tag v0.0.2
+git push --tags 
+```
