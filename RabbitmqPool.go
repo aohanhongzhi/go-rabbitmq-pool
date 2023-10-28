@@ -432,7 +432,14 @@ func (r *RabbitPool) getConnection() *rConn {
 	if int(r.connectionIndex) < len(r.connections[r.clientType]) {
 		return r.connections[r.clientType][r.connectionIndex]
 	} else {
-		return r.connections[r.clientType][0]
+		if len(r.connections[r.clientType]) > 0 {
+			return r.connections[r.clientType][0]
+		} else {
+			// 一般debug的时候可能会到这里来。
+			r.connectionLock.Unlock() // 主动释放掉锁
+			// 只能重新来一遍，这里可能会有死循环
+			return r.getConnection()
+		}
 	}
 }
 
