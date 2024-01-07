@@ -418,7 +418,7 @@ func (r *RabbitPool) getConnection() *rConn {
 		// 重新创建新的连接
 		err := r.initConnections(false)
 		if err != nil {
-			errors.New(err.Error())
+			log.Errorf("rabbitmq  init connection error %v", err.Error())
 		}
 	}
 	r.connectionLock.Lock()
@@ -428,11 +428,15 @@ func (r *RabbitPool) getConnection() *rConn {
 	currentIndex := r.rabbitLoadBalance.RoundRobin(changeConnectionIndex, r.maxConnection)
 	currentNum := currentIndex - changeConnectionIndex
 	atomic.AddInt32(&r.connectionIndex, currentNum)
-
-	if int(r.connectionIndex) < len(r.connections[r.clientType]) {
-		return r.connections[r.clientType][r.connectionIndex]
+	con := r.connections[r.clientType]
+	if con != nil {
+		if int(r.connectionIndex) < len(con) {
+			return con[r.connectionIndex]
+		} else {
+			return con[0]
+		}
 	} else {
-		return r.connections[r.clientType][0]
+		return nil
 	}
 }
 
@@ -458,7 +462,9 @@ func (r *RabbitPool) getChannelQueue(conn *rConn, exChangeName string, exChangeT
 		if err != nil {
 			return nil, err
 		}
-		rChannel.ch = channel.ch
+		if channel != nil {
+			rChannel.ch = channel.ch
+		}
 
 		addListener(rChannel, r.SendFailListener)
 
@@ -492,9 +498,9 @@ func addListener(rChannel *rChannel, callback func(a amqp.Return)) {
 							log.Errorf("消息ok=%v，消息发送失败[%v-%v]错误原因 %v(%v) %v", ok, v.Exchange, v.RoutingKey, v.ReplyText, v.ReplyCode, v.Body)
 						}
 					} else {
+						// FIXME 如果是 not ok，那么说明可能是关闭。那么当前协程没必要继续，应该关闭即可。 rChannel不可用的时候，的应该主动关闭rChannel的channel即可。
 						if i%50 == 0 {
 							//观察后期该channel还能不能接收处理消息，以及为啥关闭了呢
-
 							log.Errorf("go-channel异常,rabbitmq的消息异常rabbitmq-channel(%p)关闭状态: %v , gochannel[%v]状态%v  %v", ch, ch.IsClosed(), a, ok, string(v.Body))
 							// 打印所有发送的rabbitmq channel
 							// 直接关闭
