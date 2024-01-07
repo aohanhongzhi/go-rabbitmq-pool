@@ -428,15 +428,18 @@ func (r *RabbitPool) getConnection() *rConn {
 	currentIndex := r.rabbitLoadBalance.RoundRobin(changeConnectionIndex, r.maxConnection)
 	currentNum := currentIndex - changeConnectionIndex
 	atomic.AddInt32(&r.connectionIndex, currentNum)
-	con := r.connections[r.clientType]
-	if con != nil {
-		if int(r.connectionIndex) < len(con) {
-			return con[r.connectionIndex]
-		} else {
-			return con[0]
-		}
+
+	if int(r.connectionIndex) < len(r.connections[r.clientType]) {
+		return r.connections[r.clientType][r.connectionIndex]
 	} else {
-		return nil
+		if len(r.connections[r.clientType]) > 0 {
+			return r.connections[r.clientType][0]
+		} else {
+			// 一般debug的时候可能会到这里来。
+			r.connectionLock.Unlock() // 主动释放掉锁
+			// 只能重新来一遍，这里可能会有死循环
+			return r.getConnection()
+		}
 	}
 }
 
