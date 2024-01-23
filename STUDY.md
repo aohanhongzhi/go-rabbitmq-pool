@@ -22,6 +22,6 @@ https://learnku.com/docs/go-szgbf/1.0/working-mode-of-rabbitmq-working-mode/8738
 # 发布
 
 ```shell
-git tag v0.1.2
+git tag v0.1.5
 git push --tags 
 ```

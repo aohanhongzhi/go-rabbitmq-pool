@@ -566,17 +566,7 @@ func (r *RabbitPool) initConnections(isLock bool) error {
 func (r *RabbitPool) initChannels(conn *rConn, exChangeName string, exChangeType string, queueName string, route string) (*rChannel, error) {
 	channel, err := rCreateChannel(conn)
 	if err != nil {
-		// 这里单次重置连接
-		err2 := r.initConnections(true)
-		if err2 != nil {
-			log.Errorf("重新创建连接，重置链接失败 %v", err)
-		}
-		conn1 := r.getConnection()
-		channel, err = rCreateChannel(conn1)
-		if err != nil {
-			log.Errorf("%v", err)
-			return nil, err
-		}
+		return nil, err
 	}
 	rChannel := &rChannel{ch: channel, index: 0}
 	return rChannel, nil
@@ -1053,11 +1043,12 @@ func rPushQueue(pool *RabbitPool, data *RabbitMqData, sendTime int) *RabbitMqErr
 	rChannel, err := pool.getChannelQueue(conn, data.ExchangeName, data.ExchangeType, data.QueueName, data.Route, false, 0)
 	pool.channelLock.Unlock()
 	if err != nil {
-		fmt.Println(err)
-		return NewRabbitMqError(RCODE_GET_CHANNEL_ERROR, "获取信道失败", err.Error())
+		log.Warn(err)
+		return ReconnectAndPushQueue(pool, data, sendTime)
+		//return NewRabbitMqError(RCODE_GET_CHANNEL_ERROR, "获取信道失败", err.Error())
 	} else {
 
-		err = rChannel.ch.Publish(data.ExchangeName, data.QueueName, false, false, amqp.Publishing{
+		err = rChannel.ch.PublishWithContext(context.Background(), data.ExchangeName, data.QueueName, false, false, amqp.Publishing{
 			ContentType:  "text/plain",
 			Body:         []byte(data.Data),
 			DeliveryMode: amqp.Persistent, //持久化到磁盘
