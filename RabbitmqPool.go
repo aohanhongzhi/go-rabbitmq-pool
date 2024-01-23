@@ -566,7 +566,17 @@ func (r *RabbitPool) initConnections(isLock bool) error {
 func (r *RabbitPool) initChannels(conn *rConn, exChangeName string, exChangeType string, queueName string, route string) (*rChannel, error) {
 	channel, err := rCreateChannel(conn)
 	if err != nil {
-		return nil, err
+		// 这里单次重置连接
+		err2 := r.initConnections(true)
+		if err2 != nil {
+			log.Errorf("重新创建连接，重置链接失败 %v", err)
+		}
+		conn1 := r.getConnection()
+		channel, err = rCreateChannel(conn1)
+		if err != nil {
+			log.Errorf("%v", err)
+			return nil, err
+		}
 	}
 	rChannel := &rChannel{ch: channel, index: 0}
 	return rChannel, nil
@@ -701,13 +711,17 @@ func rConsume(pool *RabbitPool) {
 	创建一个协程监听任务
 	*/
 	select {
-	case data := <-pool.errorChanel:
-		log.Warnf("连接断开，错误信息 %v", data)
-		statusLock.Lock()
-		status = true
-		statusLock.Unlock()
-		if data != nil && data.Code != ACTIVE_CLOSE_CONNECTION_ERROR {
-			retryConsume(pool)
+	case data, ok := <-pool.errorChanel:
+		if ok {
+			log.Warnf("连接断开，错误信息 %v", data)
+			statusLock.Lock()
+			status = true
+			statusLock.Unlock()
+			if data != nil && data.Code != ACTIVE_CLOSE_CONNECTION_ERROR {
+				retryConsume(pool)
+			}
+		} else {
+			log.Warnf("关闭了，这个监听可以考虑看看是否可以退出去掉这个监听 %+v,%p", pool, pool)
 		}
 	}
 
