@@ -3,6 +3,7 @@ package kelleyRabbimqPool
 import (
 	"context"
 	rand2 "crypto/rand"
+	"runtime"
 
 	"fmt"
 	"hash/crc32"
@@ -535,12 +536,16 @@ func (r *RabbitPool) initConnections(isLock bool) error {
 	r.connectionLock.Lock()
 	defer r.connectionLock.Unlock() // 这里需要写在上面，下面有多处return，否则提前返回可能导致没有手动释放锁
 
+	_, file, line, ok := runtime.Caller(1)
+	if !ok {
+		log.Errorf("获取行号失败 %v,%v", file, line)
+	}
 	// 关闭之前所有channel
 	for key, value := range r.channelPool {
 		if r.clientType == RABBITMQ_TYPE_CONSUME {
-			log.Infof("消费者[%p]清空之前连接的rabbitmq channel %p", r, value)
+			log.Infof("消费者[%p]清空之前连接的rabbitmq channel %p 调用者 %v(%v)", r, value, file, line)
 		} else if r.clientType == RABBITMQ_TYPE_PUBLISH {
-			log.Infof("生产者[%p]清空之前连接的rabbitmq channel %p", r, value)
+			log.Infof("生产者[%p]清空之前连接的rabbitmq channel %p 调用者 %v(%v)", r, value, file, line)
 		}
 		delete(r.channelPool, key)
 	}
@@ -707,8 +712,14 @@ func rConsume(pool *RabbitPool) {
 			statusLock.Lock()
 			status = true
 			statusLock.Unlock()
-			if data != nil && data.Code != ACTIVE_CLOSE_CONNECTION_ERROR {
-				retryConsume(pool)
+			if data != nil {
+				if data.Code != ACTIVE_CLOSE_CONNECTION_ERROR {
+					retryConsume(pool)
+				} else {
+					log.Infof("主动关闭连接 %v", data)
+				}
+			} else {
+				log.Warnf("接收错误信息为空 %v", data)
 			}
 		} else {
 			log.Warnf("关闭了，这个监听可以考虑看看是否可以退出去掉这个监听 %+v,%p", pool, pool)
@@ -732,7 +743,7 @@ func retryProduce(pool *RabbitPool) {
 		//statusLock.Unlock()
 		err = pool.initConnections(false)
 		if err != nil {
-			log.Error("重新建立连接还是错误！！！")
+			log.Errorf("重新建立连接还是错误！！！%v", err)
 		} else {
 			log.Infof("重新建立连接动作完成")
 		}
@@ -747,18 +758,22 @@ func retryConsume(pool *RabbitPool) {
 
 	if pool.consumeCurrentRetry < pool.consumeMaxRetry {
 		timeSecond := CONSUMER_RETRY_INTERVAL[pool.consumeCurrentRetry]
-		log.Warnf("%v秒后开始第[%d]次重试", timeSecond, pool.consumeCurrentRetry)
+		log.Warnf("%v秒后开始第[%d]次重试,最大次数 %v", timeSecond, pool.consumeCurrentRetry, pool.consumeMaxRetry)
 		atomic.AddInt32(&pool.consumeCurrentRetry, 1)
 
 		time.Sleep(time.Second * time.Duration(timeSecond))
 		_, err := rConnect(pool, true)
 		if err != nil {
+			log.Errorf("连接错误，再次尝试 %v", err)
 			retryConsume(pool)
 		} else {
 			statusLock.Lock()
 			status = false
 			statusLock.Unlock()
-			_ = pool.initConnections(false)
+			err1 := pool.initConnections(false)
+			if err1 != nil {
+				log.Errorf("初始化连接错误 %v", err1)
+			}
 			rConsume(pool)
 		}
 	} else {
